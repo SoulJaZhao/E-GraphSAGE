@@ -41,7 +41,7 @@ test_graph_file_path = 'binary_test_graph.dgl'
 test_labels_file_path = 'binary_test_labels.npy'
 
 # 定义分类报告文件路径
-report_file_path = 'binary_classification_report.json'
+report_file_path = 'EdgeGAT_binary_classification_report.json'
 
 # 参数
 epochs = 1000
