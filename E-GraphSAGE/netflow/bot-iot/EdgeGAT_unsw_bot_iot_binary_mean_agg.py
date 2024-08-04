@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import json
+from tqdm import tqdm
 from sklearn.utils import class_weight
 from sklearn.metrics import f1_score, confusion_matrix, precision_score, recall_score, classification_report
 import warnings
@@ -243,7 +244,7 @@ opt = Adam(model.parameters())
 best_f1_score = 0.0
 
 # 训练循环
-for epoch in range(1, epochs):
+for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     # 前向传播，获取预测值
     pred = model(G, node_features, edge_features)
 
