@@ -1,4 +1,3 @@
-import dgl.nn as dglnn
 import dgl
 from dgl import from_networkx
 from dgl.nn import EdgeGATConv
@@ -249,6 +248,7 @@ opt = Adam(model.parameters())
 best_f1_score = 0.0
 
 # 训练循环
+''''
 for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     # 前向传播，获取预测值
     pred = model(G, node_features, edge_features)
@@ -277,7 +277,7 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
         best_f1_score = current_f1_score
         th.save(model, best_model_file_path)
         print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
-
+'''
 
 if os.path.exists(test_graph_file_path):
     G_test = load_graph(test_graph_file_path)
@@ -345,6 +345,12 @@ test_pred = test_pred.argmax(1)
 # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
 test_pred = test_pred.cpu().detach().numpy()
 
+data = pd.read_csv('NF-BoT-IoT.csv')
+# 将 Label 列重命名为 label
+data.rename(columns={"Attack": "label"},inplace = True)
+le = LabelEncoder()
+le.fit_transform(data.label.values)
+data['label'] = le.transform(data['label'])
 actual = le.inverse_transform(actual)
 test_pred = le.inverse_transform(test_pred)
 
