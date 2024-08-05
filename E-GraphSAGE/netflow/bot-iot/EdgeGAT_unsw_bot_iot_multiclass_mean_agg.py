@@ -45,7 +45,7 @@ test_labels_file_path = 'multicalss_test_labels.npy'
 report_file_path = 'EdgeGAT_multicalss_classification_report.json'
 
 # 参数
-epochs = 2000
+epochs = 500
 best_model_file_path = 'EdgeGAT_multiclass_best_model'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
