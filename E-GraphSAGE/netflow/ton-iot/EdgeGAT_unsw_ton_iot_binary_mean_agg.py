@@ -46,7 +46,7 @@ test_labels_file_path = 'binary_test_labels.npy'
 report_file_path = 'EdgeGAT_binary_classification_report.json'
 
 # 参数
-epochs = 1000
+epochs = 50
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
 if os.path.exists(train_graph_file_path) and os.path.exists(test_graph_file_path):
@@ -229,7 +229,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = EdgeGATModel(G.ndata['h'].shape[1], 128, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
+model = EdgeGATModel(G.ndata['h'].shape[1], 32, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
