@@ -47,7 +47,7 @@ test_labels_file_path = 'binary_test_labels.npy'
 report_file_path = 'binary_classification_report.json'
 
 # 参数
-epochs = 400
+epochs = 100
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
 if os.path.exists(train_graph_file_path) and os.path.exists(test_graph_file_path):
