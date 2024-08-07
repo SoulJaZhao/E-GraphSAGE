@@ -144,7 +144,11 @@ def compute_accuracy(pred, labels):
 # 定义计算 F1 score 的函数
 def compute_f1_score(pred, labels):
     pred_labels = pred.argmax(1).cpu().numpy()
-    true_labels = labels.cpu().numpy()
+    # 如果 labels 已经是 numpy 数组，则直接使用它
+    if isinstance(labels, np.ndarray):
+        true_labels = labels
+    else:
+        true_labels = labels.cpu().numpy()
     return f1_score(true_labels, pred_labels, average='weighted')
 
 # 定义EdgeGAT模型
@@ -243,37 +247,6 @@ opt = Adam(model.parameters())
 # 变量用于保存最高的 F1 score
 best_f1_score = 0.0
 
-# 训练循环
-for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
-    # 前向传播，获取预测值
-    pred = model(G, node_features, edge_features)
-
-    # 计算损失，只考虑训练掩码内的边
-    loss = criterion(pred[train_mask], edge_label[train_mask])
-
-    # 清零梯度
-    opt.zero_grad()
-
-    # 反向传播，计算梯度
-    loss.backward()
-
-    # 更新模型参数
-    opt.step()
-
-    # 每 100 轮输出一次训练准确度和 F1 score
-    if epoch % 100 == 0:
-        accuracy = compute_accuracy(pred[train_mask], edge_label[train_mask])
-        f1 = compute_f1_score(pred[train_mask], edge_label[train_mask])
-        print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
-
-    # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
-    current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
-    if current_f1_score > best_f1_score:
-        best_f1_score = current_f1_score
-        th.save(model, best_model_file_path)
-        print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
-
-
 if os.path.exists(test_graph_file_path):
     G_test = load_graph(test_graph_file_path)
     actual = np.load(test_labels_file_path)
@@ -323,10 +296,42 @@ start_time = timeit.default_timer()
 node_features_test = G_test.ndata['feature']
 edge_features_test = G_test.edata['h']
 
+# 训练循环
+for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
+    # 前向传播，获取预测值
+    pred = model(G, node_features, edge_features)
+
+    # 计算损失，只考虑训练掩码内的边
+    loss = criterion(pred[train_mask], edge_label[train_mask])
+
+    # 清零梯度
+    opt.zero_grad()
+
+    # 反向传播，计算梯度
+    loss.backward()
+
+    # 更新模型参数
+    opt.step()
+
+    # 每 100 轮输出一次训练准确度和 F1 score
+    if epoch % 100 == 0:
+        accuracy = compute_accuracy(pred[train_mask], edge_label[train_mask])
+        f1 = compute_f1_score(pred[train_mask], edge_label[train_mask])
+        print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
+
+    # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
+    model.eval()  # 切换到评估模式
+    with th.no_grad():  # 禁用梯度计算
+        test_pred = model(G_test, node_features_test, edge_features_test)
+        current_f1_score = compute_f1_score(test_pred, actual)
+        if current_f1_score > best_f1_score:
+            best_f1_score = current_f1_score
+            th.save(model, best_model_file_path)
+            print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
+
 # 进行前向传播，获取测试预测
 best_model = th.load(best_model_file_path)
 best_model = best_model.to(device)
-best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
 
 # 计算并打印前向传播所花费的时间

@@ -45,7 +45,7 @@ test_labels_file_path = 'multicalss_test_labels.npy'
 report_file_path = 'EdgeGAT_multicalss_classification_report.json'
 
 # 参数
-epochs = 300
+epochs = 3
 best_model_file_path = 'EdgeGAT_multiclass_best_model.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
@@ -160,7 +160,15 @@ def compute_f1_score(pred, labels):
 class EdgeGATModel(nn.Module):
     def __init__(self, ndim_in, ndim_out, edim, activation, dropout):
         super().__init__()
-        self.gnn = EdgeGATConv(
+        self.gnn1 = EdgeGATConv(
+            in_feats=ndim_in,
+            edge_feats=edim,
+            out_feats=ndim_in,
+            num_heads=8,
+            activation=activation
+        )
+
+        self.gnn2 = EdgeGATConv(
             in_feats=ndim_in,
             edge_feats=edim,
             out_feats=ndim_out,
@@ -171,7 +179,9 @@ class EdgeGATModel(nn.Module):
         self.pred = MLPPredictor(ndim_out, 10)
 
     def forward(self, g, nfeats, efeats):
-        h = self.gnn(g, nfeats, efeats)
+        h = self.gnn1(g, nfeats, efeats)
+        h = h.mean(1)
+        h = self.gnn2(g, h, efeats)
         h = h.mean(1)
         h = h.reshape(nfeats.shape[0], -1)
         return self.pred(g, h)
@@ -237,7 +247,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = EdgeGATModel(G.ndata['h'].shape[1], 128, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
+model = EdgeGATModel(G.ndata['h'].shape[1], 39, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
@@ -338,7 +348,6 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
 # 将模型移动到设备上（GPU 或 CPU）
 best_model = th.load(best_model_file_path)
 best_model = best_model.to(device)
-best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
 
 # 计算并打印前向传播所花费的时间

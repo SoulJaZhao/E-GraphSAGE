@@ -343,7 +343,6 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
 # 进行前向传播，获取测试预测
 best_model = th.load(best_model_file_path)
 best_model = best_model.to(device)
-best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
 
 # 计算并打印前向传播所花费的时间
