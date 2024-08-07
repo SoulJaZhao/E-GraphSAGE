@@ -1,8 +1,8 @@
 {
     "Benign": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
+        "precision": 0.451879042690815,
+        "recall": 0.8615818163879434,
+        "f1-score": 0.592831927496139,
         "support": 162168
     },
     "backdoor": {
@@ -12,15 +12,15 @@
         "support": 10348
     },
     "ddos": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
+        "precision": 0.3242502951593861,
+        "recall": 0.03506496159503187,
+        "f1-score": 0.06328606388518916,
         "support": 195808
     },
     "dos": {
-        "precision": 0.006759735862050563,
-        "recall": 0.5004703668861712,
-        "f1-score": 0.013339300915321766,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 10630
     },
     "injection": {
@@ -30,9 +30,9 @@
         "support": 281124
     },
     "mitm": {
-        "precision": 0.009643483343074225,
-        "recall": 0.2551546391752577,
-        "f1-score": 0.018584569175896373,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 776
     },
     "password": {
@@ -42,9 +42,9 @@
         "support": 93780
     },
     "ransomware": {
-        "precision": 0.004295489735777433,
-        "recall": 1.0,
-        "f1-score": 0.00855423484358681,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 86
     },
     "scanning": {
@@ -54,22 +54,22 @@
         "support": 12880
     },
     "xss": {
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1-score": 0.0,
+        "precision": 0.11536875144613341,
+        "recall": 0.9562085181602908,
+        "f1-score": 0.20589571278014868,
         "support": 59966
     },
-    "accuracy": 0.006771665341495422,
+    "accuracy": 0.24641780836815433,
     "macro avg": {
-        "precision": 0.002069870894090222,
-        "recall": 0.1755625006061429,
-        "f1-score": 0.004047810493480495,
+        "precision": 0.08914980892963345,
+        "recall": 0.18528552961432662,
+        "f1-score": 0.08620137041614769,
         "support": 827566
     },
     "weighted avg": {
-        "precision": 9.631708819006574e-05,
-        "recall": 0.006771665341495422,
-        "f1-score": 0.0001896574516194653,
+        "precision": 0.1736288404053236,
+        "recall": 0.24641780836815433,
+        "f1-score": 0.1460633084587808,
         "support": 827566
     }
 }
