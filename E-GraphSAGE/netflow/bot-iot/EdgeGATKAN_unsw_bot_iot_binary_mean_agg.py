@@ -277,7 +277,7 @@ else:
     actual = G_test.edata.pop('label')
 
     # 为 G_test 的每个节点设置 'feature' 属性，初始值为全 1 的张量，维度与训练图中的节点特征相同
-    G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[2])
+    G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[1])
 
     # 保存测试图 G_test 到指定路径
     save_graph(G_test, test_graph_file_path)
@@ -295,7 +295,7 @@ start_time = timeit.default_timer()
 # 获取测试图的节点特征和边特征
 node_features_test = G_test.ndata['feature']
 edge_features_test = G_test.edata['h']
-
+'''
 # 训练循环
 for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     # 前向传播，获取预测值
@@ -328,6 +328,7 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
             best_f1_score = current_f1_score
             th.save(model, best_model_file_path)
             print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
+'''
 
 # 进行前向传播，获取测试预测
 best_model = th.load(best_model_file_path)
