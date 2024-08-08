@@ -23,7 +23,9 @@ from sklearn.utils import class_weight
 from torch.optim import Adam
 from tqdm import tqdm
 from efficientKan import KANLinear
-from imblearn.under_sampling import RandomUnderSampler
+from imblearn.under_sampling import RandomUnderSampler, NearMiss, InstanceHardnessThreshold, CondensedNearestNeighbour
+from sklearn.ensemble import RandomForestClassifier
+
 
 warnings.filterwarnings("ignore")
 
@@ -56,6 +58,8 @@ else:
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
 
+    data = data.groupby(by='Attack').sample(frac=0.03, random_state=2023)
+
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
     data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(lambda x: socket.inet_ntoa(struct.pack('>I', random.randint(0xac100001, 0xac1f0001))))
@@ -87,31 +91,21 @@ else:
     le.fit_transform(data.label.values)
     data['label'] = le.transform(data['label'])
 
-    # 初始化随机下采样器
-    rus = RandomUnderSampler(random_state=2024)
-
-    # 进行下采样
-    data_resampled, label_resampled = rus.fit_resample(data.drop(columns=['label']), data['label'])
-
-    # 将 label 列重新加入到 data_resampled DataFrame 中，作为最后一列
-    data_resampled = pd.concat([pd.DataFrame(data_resampled, columns=data.drop(columns=['label']).columns),
-                                pd.DataFrame(label_resampled, columns=['label'])], axis=1)
-
     # 将 label 列提取出来，保存到一个单独的变量中
-    label = data_resampled.label
+    label = data.label
 
     # 从原始数据中删除 label 列
-    data_resampled.drop(columns=['label'], inplace=True)
+    data.drop(columns=['label'], inplace=True)
 
     # 创建 StandardScaler 对象，用于标准化数据
     scaler = StandardScaler()
 
     # 将 label 列重新加入到 data DataFrame 中，作为最后一列
-    data_resampled = pd.concat([data_resampled, label], axis=1)
+    data = pd.concat([data, label], axis=1)
 
     # 将数据分为训练集和测试集，按 70% 和 30% 的比例分配，保证 stratify 参数确保按标签分层抽样
     X_train, X_test, y_train, y_test = train_test_split(
-        data_resampled, label, test_size=0.3, random_state=2024, stratify=label)
+        data, label, test_size=0.3, random_state=2024, stratify=label)
 
     # 创建 TargetEncoder 对象，用于对分类特征进行目标编码
     encoder = ce.TargetEncoder(cols=['TCP_FLAGS', 'L7_PROTO', 'PROTOCOL'])

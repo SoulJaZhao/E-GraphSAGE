@@ -26,6 +26,7 @@ from tqdm import tqdm
 from sklearn.utils import class_weight
 from sklearn.metrics import f1_score, confusion_matrix, precision_score, recall_score, classification_report
 import warnings
+from imblearn.under_sampling import RandomUnderSampler
 
 warnings.filterwarnings("ignore")
 
@@ -47,7 +48,7 @@ report_file_path = 'multicalss_classification_v2_report.json'
 
 # 参数
 epochs = 1000
-best_model_file_path = 'multiclass_best_model.pth'
+best_model_file_path = 'multiclass_best_model_v2.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
 if os.path.exists(train_graph_file_path) and os.path.exists(test_graph_file_path):
