@@ -46,7 +46,7 @@ test_labels_file_path = 'multicalss_test_labels_v2.npy'
 report_file_path = 'EdgeGATKAN_multiclass_classification_v2_report.json'
 
 # 参数
-epochs = 300
+epochs = 500
 best_model_file_path = 'EdgeGATKAN_multiclass_v2_best_model.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
@@ -58,7 +58,7 @@ else:
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
 
-    data = data.groupby(by='Attack').sample(frac=0.03, random_state=2023)
+    data = data.groupby(by='Attack').sample(frac=0.001, random_state=2023)
 
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
@@ -241,7 +241,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = EdgeGATModel(G.ndata['h'].shape[1], 39, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
+model = EdgeGATModel(G.ndata['h'].shape[1], 64, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
@@ -306,6 +306,7 @@ node_features_test = G_test.ndata['feature']
 edge_features_test = G_test.edata['h']
 
 # 训练循环
+'''
 for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     # 前向传播，获取预测值
     pred = model(G, node_features, edge_features)
@@ -337,7 +338,7 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
             best_f1_score = current_f1_score
             th.save(model, best_model_file_path)
             print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
-
+'''
 # 进行前向传播，获取测试预测
 # 将模型移动到设备上（GPU 或 CPU）
 best_model = th.load(best_model_file_path)

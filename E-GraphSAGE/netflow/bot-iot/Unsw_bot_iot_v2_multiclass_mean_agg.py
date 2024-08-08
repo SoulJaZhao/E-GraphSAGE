@@ -47,7 +47,7 @@ test_labels_file_path = 'multicalss_test_labels_v2.npy'
 report_file_path = 'multicalss_classification_v2_report.json'
 
 # 参数
-epochs = 1000
+epochs = 100
 best_model_file_path = 'multiclass_best_model_v2.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
@@ -58,6 +58,8 @@ else:
     print("Train graph or test graph file not found. Creating new graph.")
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
+
+    data = data.groupby(by='Attack').sample(frac=0.001, random_state=2023)
 
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
@@ -91,31 +93,21 @@ else:
     le.fit_transform(data.label.values)
     data['label'] = le.transform(data['label'])
 
-    # 初始化随机下采样器
-    rus = RandomUnderSampler(random_state=2024)
-
-    # 进行下采样
-    data_resampled, label_resampled = rus.fit_resample(data.drop(columns=['label']), data['label'])
-
-    # 将 label 列重新加入到 data_resampled DataFrame 中，作为最后一列
-    data_resampled = pd.concat([pd.DataFrame(data_resampled, columns=data.drop(columns=['label']).columns),
-                                pd.DataFrame(label_resampled, columns=['label'])], axis=1)
-
     # 将 label 列提取出来，保存到一个单独的变量中
-    label = data_resampled.label
+    label = data.label
 
     # 从原始数据中删除 label 列
-    data_resampled.drop(columns=['label'], inplace=True)
+    data.drop(columns=['label'], inplace=True)
 
     # 创建 StandardScaler 对象，用于标准化数据
     scaler = StandardScaler()
 
     # 将 label 列重新加入到 data DataFrame 中，作为最后一列
-    data_resampled = pd.concat([data_resampled, label], axis=1)
+    data = pd.concat([data, label], axis=1)
 
     # 将数据分为训练集和测试集，按 70% 和 30% 的比例分配，保证 stratify 参数确保按标签分层抽样
     X_train, X_test, y_train, y_test = train_test_split(
-        data_resampled, label, test_size=0.3, random_state=2024, stratify=label)
+        data, label, test_size=0.3, random_state=2024, stratify=label)
 
     # 创建 TargetEncoder 对象，用于对分类特征进行目标编码
     encoder = ce.TargetEncoder(cols=['TCP_FLAGS', 'L7_PROTO', 'PROTOCOL'])
@@ -346,12 +338,12 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
         f1 = compute_f1_score(pred[train_mask], edge_label[train_mask])
         print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
 
-    # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
-    current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
-    if current_f1_score > best_f1_score:
-        best_f1_score = current_f1_score
-        th.save(model, best_model_file_path)
-        print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
+    # # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
+    # current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
+    # if current_f1_score > best_f1_score:
+    #     best_f1_score = current_f1_score
+    #     th.save(model, best_model_file_path)
+    #     print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
 
 
 if os.path.exists(test_graph_file_path):
@@ -415,10 +407,7 @@ edge_features_test = G_test.edata['h']
 
 # 进行前向传播，获取测试预测
 # 将模型移动到设备上（GPU 或 CPU）
-best_model = th.load(best_model_file_path)
-best_model = best_model.to(device)
-best_model.eval()
-test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
+test_pred = model(G_test, node_features_test, edge_features_test).to(device)
 
 # 计算并打印前向传播所花费的时间
 elapsed = timeit.default_timer() - start_time
