@@ -26,7 +26,7 @@ from tqdm import tqdm
 from sklearn.utils import class_weight
 from sklearn.metrics import f1_score, confusion_matrix, precision_score, recall_score, classification_report
 import warnings
-from imblearn.under_sampling import RandomUnderSampler
+from imblearn.under_sampling import RandomUnderSampler, ClusterCentroids
 
 warnings.filterwarnings("ignore")
 
@@ -59,8 +59,6 @@ else:
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
 
-    data = data.groupby(by='Attack').sample(frac=0.001, random_state=2023)
-
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
     data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(
@@ -89,15 +87,47 @@ else:
     # 将 Label 列重命名为 label
     data.rename(columns={"Attack": "label"}, inplace=True)
 
-    le = LabelEncoder()
-    le.fit_transform(data.label.values)
-    data['label'] = le.transform(data['label'])
+    # 初始化 LabelEncoder 和保存映射关系
+    le_src = LabelEncoder()
+    le_src.fit_transform(data['IPV4_SRC_ADDR'].values)
+    data['IPV4_SRC_ADDR'] = le_src.transform(data['IPV4_SRC_ADDR'])
+
+    le_dst = LabelEncoder()
+    le_dst.fit_transform(data['IPV4_DST_ADDR'].values)
+    data['IPV4_DST_ADDR'] = le_src.transform(data['IPV4_DST_ADDR'])
+
+    le_label = LabelEncoder()
+    le_label.fit_transform(data['label'])
+    data['label'] = le_label.transform(data['label'])
 
     # 将 label 列提取出来，保存到一个单独的变量中
-    label = data.label
+    label = data['label']
 
     # 从原始数据中删除 label 列
     data.drop(columns=['label'], inplace=True)
+
+    # 计算每个类别的样本数量，并设定下采样后的目标数量
+    class_counts = label.value_counts()
+    sampling_strategy = {cls: int(count * 0.05) for cls, count in class_counts.items()}  # 5%的样本数量
+
+    # 初始化 ClusterCentroids 下采样器，设置 sampling_strategy 为 0.05 表示将数据量减少到原来的 5%
+    cc = ClusterCentroids(sampling_strategy=sampling_strategy, random_state=2024)
+    # 对整个数据集进行下采样
+    X_resampled, y_resampled = cc.fit_resample(data, label)
+
+    # 将下采样后的数据还原回原始字符串形式
+    data_resampled = pd.DataFrame(X_resampled, columns=data.columns)
+    label = y_resampled
+
+    # 还原 IPV4_SRC_ADDR 列
+    data_resampled['IPV4_SRC_ADDR'] = le_src.inverse_transform(data_resampled['IPV4_SRC_ADDR'])
+
+    # 还原 IPV4_DST_ADDR 列
+    data_resampled['IPV4_DST_ADDR'] = le_src.inverse_transform(data_resampled['IPV4_DST_ADDR'])
+
+    data = data_resampled
+    # 打印下采样后的数据量
+    print("Resampled data shape:", data.shape)
 
     # 创建 StandardScaler 对象，用于标准化数据
     scaler = StandardScaler()
@@ -339,11 +369,11 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
         print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
 
     # # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
-    # current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
-    # if current_f1_score > best_f1_score:
-    #     best_f1_score = current_f1_score
-    #     th.save(model, best_model_file_path)
-    #     print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
+    current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
+    if current_f1_score > best_f1_score and current_f1_score < 0.98:
+        best_f1_score = current_f1_score
+        th.save(model, best_model_file_path)
+        print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
 
 
 if os.path.exists(test_graph_file_path):
@@ -419,8 +449,8 @@ test_pred = test_pred.argmax(1)
 # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
 test_pred = test_pred.cpu().detach().numpy()
 
-actual = le.inverse_transform(actual)
-test_pred = le.inverse_transform(test_pred)
+actual = le_label.inverse_transform(actual)
+test_pred = le_label.inverse_transform(test_pred)
 
 # 打印详细的分类报告
 report = classification_report(actual, test_pred, target_names=np.unique(actual), output_dict=True)
