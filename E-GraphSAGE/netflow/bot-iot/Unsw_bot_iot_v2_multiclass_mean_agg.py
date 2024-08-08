@@ -59,6 +59,8 @@ else:
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
 
+    data = data.groupby(by='Attack').sample(frac=0.1, random_state=2024)
+
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
     data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(
@@ -89,16 +91,13 @@ else:
 
     # 初始化 LabelEncoder 和保存映射关系
     le_src = LabelEncoder()
-    le_src.fit_transform(data['IPV4_SRC_ADDR'].values)
-    data['IPV4_SRC_ADDR'] = le_src.transform(data['IPV4_SRC_ADDR'])
+    data['IPV4_SRC_ADDR'] = le_src.fit_transform(data['IPV4_SRC_ADDR'])
 
     le_dst = LabelEncoder()
-    le_dst.fit_transform(data['IPV4_DST_ADDR'].values)
-    data['IPV4_DST_ADDR'] = le_dst.transform(data['IPV4_DST_ADDR'])
+    data['IPV4_DST_ADDR'] = le_dst.fit_transform(data['IPV4_DST_ADDR'])
 
     le_label = LabelEncoder()
-    le_label.fit_transform(data['label'])
-    data['label'] = le_label.transform(data['label'])
+    data['label'] = le_label.fit_transform(data['label'])
 
     # 将 label 列提取出来，保存到一个单独的变量中
     label = data['label']
@@ -108,12 +107,12 @@ else:
 
     # 计算每个类别的样本数量，并设定下采样后的目标数量
     class_counts = label.value_counts()
-    sampling_strategy = {cls: int(count * 0.05) for cls, count in class_counts.items()}  # 5%的样本数量
+    sampling_strategy = {cls: int(count * 0.5) for cls, count in class_counts.items()}  # 50%的样本数量
 
     # 初始化 ClusterCentroids 下采样器，设置 sampling_strategy 为 0.05 表示将数据量减少到原来的 5%
-    cc = ClusterCentroids(sampling_strategy=sampling_strategy, random_state=2024)
+    rus = RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=2024)
     # 对整个数据集进行下采样
-    X_resampled, y_resampled = cc.fit_resample(data, label)
+    X_resampled, y_resampled = rus.fit_resample(data, label)
 
     # 将下采样后的数据还原回原始字符串形式
     data_resampled = pd.DataFrame(X_resampled, columns=data.columns)
@@ -128,6 +127,9 @@ else:
     data = data_resampled
     # 打印下采样后的数据量
     print("Resampled data shape:", data.shape)
+
+    # 保存下采样后的数据
+    data_resampled.to_csv('NF-BoT-IoT-resampled.csv', index=False)
 
     # 创建 StandardScaler 对象，用于标准化数据
     scaler = StandardScaler()
