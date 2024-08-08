@@ -94,7 +94,7 @@ else:
 
     le_dst = LabelEncoder()
     le_dst.fit_transform(data['IPV4_DST_ADDR'].values)
-    data['IPV4_DST_ADDR'] = le_src.transform(data['IPV4_DST_ADDR'])
+    data['IPV4_DST_ADDR'] = le_dst.transform(data['IPV4_DST_ADDR'])
 
     le_label = LabelEncoder()
     le_label.fit_transform(data['label'])
@@ -123,7 +123,7 @@ else:
     data_resampled['IPV4_SRC_ADDR'] = le_src.inverse_transform(data_resampled['IPV4_SRC_ADDR'])
 
     # 还原 IPV4_DST_ADDR 列
-    data_resampled['IPV4_DST_ADDR'] = le_src.inverse_transform(data_resampled['IPV4_DST_ADDR'])
+    data_resampled['IPV4_DST_ADDR'] = le_dst.inverse_transform(data_resampled['IPV4_DST_ADDR'])
 
     data = data_resampled
     # 打印下采样后的数据量
