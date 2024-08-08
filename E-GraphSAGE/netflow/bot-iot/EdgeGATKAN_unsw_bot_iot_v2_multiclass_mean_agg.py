@@ -58,11 +58,12 @@ else:
     # 读取 CSV 文件到 DataFrame
     data = pd.read_csv('NF-BoT-IoT-v2.csv')
 
-    data = data.groupby(by='Attack').sample(frac=0.001, random_state=2023)
+    data = data.groupby(by='Attack').sample(frac=0.1, random_state=2024)
 
     # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
     # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
-    data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(lambda x: socket.inet_ntoa(struct.pack('>I', random.randint(0xac100001, 0xac1f0001))))
+    data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(
+        lambda x: socket.inet_ntoa(struct.pack('>I', random.randint(0xac100001, 0xac1f0001))))
 
     # 将 IPV4_SRC_ADDR 列中的每个值转换为字符串类型
     data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(str)
@@ -82,20 +83,52 @@ else:
     data.drop(columns=['L4_SRC_PORT', 'L4_DST_PORT'], inplace=True)
 
     # 删除不再需要的 Label 列
-    data.drop(columns=['Label'],inplace = True)
+    data.drop(columns=['Label'], inplace=True)
 
     # 将 Label 列重命名为 label
-    data.rename(columns={"Attack": "label"},inplace = True)
+    data.rename(columns={"Attack": "label"}, inplace=True)
 
-    le = LabelEncoder()
-    le.fit_transform(data.label.values)
-    data['label'] = le.transform(data['label'])
+    # 初始化 LabelEncoder 和保存映射关系
+    le_src = LabelEncoder()
+    data['IPV4_SRC_ADDR'] = le_src.fit_transform(data['IPV4_SRC_ADDR'])
+
+    le_dst = LabelEncoder()
+    data['IPV4_DST_ADDR'] = le_dst.fit_transform(data['IPV4_DST_ADDR'])
+
+    le_label = LabelEncoder()
+    data['label'] = le_label.fit_transform(data['label'])
 
     # 将 label 列提取出来，保存到一个单独的变量中
-    label = data.label
+    label = data['label']
 
     # 从原始数据中删除 label 列
     data.drop(columns=['label'], inplace=True)
+
+    # 计算每个类别的样本数量，并设定下采样后的目标数量
+    class_counts = label.value_counts()
+    sampling_strategy = {cls: int(count * 0.5) for cls, count in class_counts.items()}  # 50%的样本数量
+
+    # 初始化 ClusterCentroids 下采样器，设置 sampling_strategy 为 0.05 表示将数据量减少到原来的 5%
+    rus = RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=2024)
+    # 对整个数据集进行下采样
+    X_resampled, y_resampled = rus.fit_resample(data, label)
+
+    # 将下采样后的数据还原回原始字符串形式
+    data_resampled = pd.DataFrame(X_resampled, columns=data.columns)
+    label = y_resampled
+
+    # 还原 IPV4_SRC_ADDR 列
+    data_resampled['IPV4_SRC_ADDR'] = le_src.inverse_transform(data_resampled['IPV4_SRC_ADDR'])
+
+    # 还原 IPV4_DST_ADDR 列
+    data_resampled['IPV4_DST_ADDR'] = le_dst.inverse_transform(data_resampled['IPV4_DST_ADDR'])
+
+    data = data_resampled
+    # 打印下采样后的数据量
+    print("Resampled data shape:", data.shape)
+
+    # 保存下采样后的数据
+    data_resampled.to_csv('NF-BoT-IoT-resampled.csv', index=False)
 
     # 创建 StandardScaler 对象，用于标准化数据
     scaler = StandardScaler()
