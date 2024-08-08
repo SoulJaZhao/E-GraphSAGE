@@ -47,7 +47,7 @@ test_labels_file_path = 'multicalss_test_labels_v2.npy'
 report_file_path = 'multicalss_classification_v2_report.json'
 
 # 参数
-epochs = 100
+epochs = 300
 best_model_file_path = 'multiclass_best_model_v2.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
@@ -370,7 +370,7 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
 
     # # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
     current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
-    if current_f1_score > best_f1_score and current_f1_score < 0.98:
+    if current_f1_score > best_f1_score:
         best_f1_score = current_f1_score
         th.save(model, best_model_file_path)
         print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
