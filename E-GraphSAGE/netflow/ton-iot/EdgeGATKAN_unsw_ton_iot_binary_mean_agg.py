@@ -236,7 +236,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = EdgeGATModel(G.ndata['h'].shape[1], 128, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
+model = EdgeGATModel(G.ndata['h'].shape[1], 39, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
