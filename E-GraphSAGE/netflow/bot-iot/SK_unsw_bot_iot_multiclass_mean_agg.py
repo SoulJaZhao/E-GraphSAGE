@@ -260,7 +260,14 @@ class MLPPredictor(nn.Module):
         super().__init__()
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
-        self.W = KANLinear(in_features * 2, out_classes)
+        # self.W = KANLinear(in_features * 2, out_classes)
+
+        # 第一层 KANLinear，输入维度为两倍的节点特征维度
+        self.fc1 = KANLinear(in_features * 2, in_features)
+        # 激活函数
+        self.relu = nn.ReLU()
+        # 第二层 KANLinear，输出维度为指定的类别数
+        self.fc2 = KANLinear(in_features, out_classes)
 
     # 定义边应用函数，edges是DGL中的边数据
     def apply_edges(self, edges):
@@ -269,7 +276,16 @@ class MLPPredictor(nn.Module):
         # 获取目标节点特征
         h_v = edges.dst['h']
         # 将源节点和目标节点的特征连接起来，通过线性层转换
-        score = self.W(th.cat([h_u, h_v], 1))
+        # score = self.W(th.cat([h_u, h_v], 1))
+
+        # 将源节点和目标节点的特征连接起来，通过线性层转换
+        combined_features = th.cat([h_u, h_v], 1)
+
+        # 通过两层 KANLinear 进行特征转换
+        x = self.fc1(combined_features)
+        x = self.relu(x)
+        score = self.fc2(x)
+
         # 返回包含预测得分的字典
         return {'score': score}
 
