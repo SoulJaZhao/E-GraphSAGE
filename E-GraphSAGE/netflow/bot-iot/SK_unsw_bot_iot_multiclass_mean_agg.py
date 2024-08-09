@@ -203,7 +203,7 @@ class SAGELayer(nn.Module):
         # 保存激活函数
         self.activation = activation
         # SK attention
-        self.sk_attention = SKAttention(ndim_out, 8)
+        self.sk_attention = SKAttention(channel=ndim_out, reduction=8)
 
     # 定义消息传递函数，edges是DGL中的边数据
     def message_func(self, edges):
