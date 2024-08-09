@@ -1,31 +1,32 @@
-import json
-import os
-import random
-import socket
-import struct
-import warnings
-
-import category_encoders as ce
+import dgl.nn as dglnn
 import dgl
-import networkx as nx
-import numpy as np
-import pandas as pd
-import torch as th
-import torch.nn as nn
-import torch.nn.functional as F
 from dgl import from_networkx
 from dgl.nn import EdgeGATConv
-from sklearn.metrics import f1_score, confusion_matrix, classification_report
-from sklearn.model_selection import train_test_split
+import torch.nn as nn
+import torch as th
+import torch.nn.functional as F
+from torch.optim import Adam
+import dgl.function as fn
+import networkx as nx
+import pandas as pd
+import socket
+import struct
+import random
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import class_weight
-from torch.optim import Adam
+from sklearn.model_selection import train_test_split
+import category_encoders as ce
+from sklearn.decomposition import PCA
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import json
 from tqdm import tqdm
-from efficientKan import KANLinear
-from imblearn.under_sampling import RandomUnderSampler, NearMiss, InstanceHardnessThreshold, CondensedNearestNeighbour
-from sklearn.ensemble import RandomForestClassifier
-
+from sklearn.utils import class_weight
+from sklearn.metrics import f1_score, confusion_matrix, precision_score, recall_score, classification_report
+import warnings
+from imblearn.under_sampling import RandomUnderSampler, ClusterCentroids
 
 warnings.filterwarnings("ignore")
 
@@ -43,11 +44,11 @@ test_graph_file_path = 'multicalss_test_graph_v2.dgl'
 test_labels_file_path = 'multicalss_test_labels_v2.npy'
 
 # 定义分类报告文件路径
-report_file_path = 'EdgeGATKAN_multiclass_classification_v2_report.json'
+report_file_path = 'multicalss_classification_v2_report.json'
 
 # 参数
-epochs = 1000
-best_model_file_path = 'EdgeGATKAN_multiclass_v2_best_model.pth'
+epochs = 300
+best_model_file_path = 'multiclass_best_model_v2.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
 if os.path.exists(train_graph_file_path) and os.path.exists(test_graph_file_path):
@@ -185,32 +186,82 @@ def compute_accuracy(pred, labels):
 # 定义计算 F1 score 的函数
 def compute_f1_score(pred, labels):
     pred_labels = pred.argmax(1).cpu().numpy()
-    # 如果 labels 已经是 numpy 数组，则直接使用它
-    if isinstance(labels, np.ndarray):
-        true_labels = labels
-    else:
-        true_labels = labels.cpu().numpy()
+    true_labels = labels.cpu().numpy()
     return f1_score(true_labels, pred_labels, average='weighted')
 
-# 定义EdgeGAT模型
-class EdgeGATModel(nn.Module):
+class SEAttention(nn.Module):
+    def __init__(self, in_channels, reduction=16):
+        super(SEAttention, self).__init__()
+        self.fc1 = nn.Linear(in_channels, in_channels // reduction)
+        self.fc2 = nn.Linear(in_channels // reduction, in_channels)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+        squeeze = F.adaptive_avg_pool2d(x, (1, 1)).view(b, c)
+        excitation = F.relu(self.fc1(squeeze))
+        excitation = self.sigmoid(self.fc2(excitation)).view(b, c, 1, 1)
+        return x * excitation
+class SAGELayer(nn.Module):
+    def __init__(self, ndim_in, edims, ndim_out, activation):
+        super(SAGELayer, self).__init__()
+        # 初始化SAGELayer类
+        # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
+        self.W_msg = nn.Linear(ndim_in + edims, ndim_out)
+        # 定义应用权重的线性层，输入维度为节点特征和消息传递输出之和，输出维度为指定的ndim_out
+        self.W_apply = nn.Linear(ndim_in + ndim_out, ndim_out)
+        # 保存激活函数
+        self.activation = activation
+        self.se_attention = SEAttention(ndim_out)
+
+    # 定义消息传递函数，edges是DGL中的边数据
+    def message_func(self, edges):
+        # 将源节点特征和边特征连接起来，并通过线性层转换
+        return {'m': self.W_msg(th.cat([edges.src['h'], edges.data['h']], 2))}
+
+    # 定义前向传播函数
+    def forward(self, g_dgl, nfeats, efeats):
+        with g_dgl.local_scope():
+            g = g_dgl
+            # 设置节点特征和边特征
+            g.ndata['h'] = nfeats
+            g.edata['h'] = efeats
+            # 执行消息传递和聚合操作，更新节点特征
+            g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
+
+            aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
+            aggregated_feats = self.se_attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
+
+            # 将聚合后的特征和原始特征连接起来，通过线性层和激活函数进行转换
+            g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
+            # 返回更新后的节点特征
+            return g.ndata['h']
+
+# 定义一个SAGE类，继承自nn.Module
+class SAGE(nn.Module):
     def __init__(self, ndim_in, ndim_out, edim, activation, dropout):
-        super().__init__()
-        self.gnn = EdgeGATConv(
-            in_feats=ndim_in,
-            edge_feats=edim,
-            out_feats=ndim_out,
-            num_heads=3,
-            activation=activation
-        )
+        super(SAGE, self).__init__()
+        # 初始化SAGE类
+        # 创建一个ModuleList来存储SAGELayer层
+        self.layers = nn.ModuleList()
+        # 添加第一层SAGELayer，输入维度为ndim_in，输出维度为128
+        self.layers.append(SAGELayer(ndim_in, edim, 128, activation))
+        # 添加第二层SAGELayer，输入维度为128，输出维度为ndim_out
+        self.layers.append(SAGELayer(128, edim, ndim_out, activation))
+        # 定义dropout层，使用指定的dropout率
+        self.dropout = nn.Dropout(p=dropout)
 
-        self.pred = MLPPredictor(ndim_out, 5)
-
+    # 定义前向传播函数
     def forward(self, g, nfeats, efeats):
-        h = self.gnn(g, nfeats, efeats)
-        h = h.mean(1)
-        h = h.reshape(nfeats.shape[0], -1)
-        return self.pred(g, h)
+        # 遍历每一层SAGELayer
+        for i, layer in enumerate(self.layers):
+            # 除第一层外，在输入到下一层前应用dropout
+            if i != 0:
+                nfeats = self.dropout(nfeats)
+            # 执行SAGELayer的前向传播
+            nfeats = layer(g, nfeats, efeats)
+        # 返回每个节点特征的和
+        return nfeats.sum(1)
 
 # 定义一个MLPPredictor类，继承自nn.Module
 class MLPPredictor(nn.Module):
@@ -218,8 +269,7 @@ class MLPPredictor(nn.Module):
         super().__init__()
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
-        # self.W = nn.Linear(in_features * 2, out_classes)
-        self.W = KANLinear(in_features * 2, out_classes)
+        self.W = nn.Linear(in_features * 2, out_classes)
 
     # 定义边应用函数，edges是DGL中的边数据
     def apply_edges(self, edges):
@@ -242,6 +292,33 @@ class MLPPredictor(nn.Module):
             graph.apply_edges(self.apply_edges)
             # 返回边数据中的预测得分
             return graph.edata['score']
+
+# 将节点特征重塑为三维张量
+# 原始节点特征维度为 (num_nodes, feature_dim)
+# 重塑后的维度为 (num_nodes, 1, feature_dim)
+G.ndata['h'] = th.reshape(G.ndata['h'], (G.ndata['h'].shape[0], 1, G.ndata['h'].shape[1]))
+
+# 将边特征重塑为三维张量
+# 原始边特征维度为 (num_edges, feature_dim)
+# 重塑后的维度为 (num_edges, 1, feature_dim)
+G.edata['h'] = th.reshape(G.edata['h'], (G.edata['h'].shape[0], 1, G.edata['h'].shape[1]))
+
+# 定义一个Model类，继承自nn.Module
+class Model(nn.Module):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout):
+        super().__init__()
+        # 初始化Model类
+        # 创建一个SAGE模型，用于图神经网络层
+        self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout)
+        # 创建一个MLPPredictor模型，用于边的预测
+        self.pred = MLPPredictor(ndim_out, 5)
+
+    # 定义前向传播函数
+    def forward(self, g, nfeats, efeats):
+        # 使用SAGE模型进行节点特征的计算
+        h = self.gnn(g, nfeats, efeats)
+        # 使用MLPPredictor模型进行边的预测，并返回预测结果
+        return self.pred(g, h)
 
 # 从图的边属性中提取标签并转换为 numpy 数组
 edge_labels = G.edata['label'].cpu().numpy()
@@ -274,7 +351,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = EdgeGATModel(G.ndata['h'].shape[1], 32, G.ndata['h'].shape[1], F.relu, 0.2).to(device)
+model = Model(G.ndata['h'].shape[2], 128, G.ndata['h'].shape[2], F.relu, 0.2).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
@@ -287,6 +364,36 @@ opt = Adam(model.parameters())
 
 # 变量用于保存最高的 F1 score
 best_f1_score = 0.0
+
+# 训练循环
+for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
+    # 前向传播，获取预测值
+    pred = model(G, node_features, edge_features)
+
+    # 计算损失，只考虑训练掩码内的边
+    loss = criterion(pred[train_mask], edge_label[train_mask])
+
+    # 清零梯度
+    opt.zero_grad()
+
+    # 反向传播，计算梯度
+    loss.backward()
+
+    # 更新模型参数
+    opt.step()
+
+    # 每 100 轮输出一次训练准确度和 F1 score
+    if epoch % 100 == 0:
+        accuracy = compute_accuracy(pred[train_mask], edge_label[train_mask])
+        f1 = compute_f1_score(pred[train_mask], edge_label[train_mask])
+        print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
+
+    # # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
+    current_f1_score = compute_f1_score(pred[train_mask], edge_label[train_mask])
+    if current_f1_score > best_f1_score:
+        best_f1_score = current_f1_score
+        th.save(model, best_model_file_path)
+        print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
 
 
 if os.path.exists(test_graph_file_path):
@@ -319,12 +426,22 @@ else:
     actual = G_test.edata.pop('label')
 
     # 为 G_test 的每个节点设置 'feature' 属性，初始值为全 1 的张量，维度与训练图中的节点特征相同
-    G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[1])
+    G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[2])
 
     # 保存测试图 G_test 到指定路径
     save_graph(G_test, test_graph_file_path)
     np.save(test_labels_file_path, actual)
     print("Test graph created and saved to file.")
+
+# 重塑测试图的节点特征为三维张量
+# 原始节点特征维度为 (num_nodes, feature_dim)
+# 重塑后的维度为 (num_nodes, 1, feature_dim)
+G_test.ndata['feature'] = th.reshape(G_test.ndata['feature'], (G_test.ndata['feature'].shape[0], 1, G_test.ndata['feature'].shape[1]))
+
+# 重塑测试图的边特征为三维张量
+# 原始边特征维度为 (num_edges, feature_dim)
+# 重塑后的维度为 (num_edges, 1, feature_dim)
+G_test.edata['h'] = th.reshape(G_test.edata['h'], (G_test.edata['h'].shape[0], 1, G_test.edata['h'].shape[1]))
 
 # 将测试图移动到设备（GPU 或 CPU）
 G_test = G_test.to(device)
@@ -338,45 +455,9 @@ start_time = timeit.default_timer()
 node_features_test = G_test.ndata['feature']
 edge_features_test = G_test.edata['h']
 
-# 训练循环
-for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
-    # 前向传播，获取预测值
-    pred = model(G, node_features, edge_features)
-
-    # 计算损失，只考虑训练掩码内的边
-    loss = criterion(pred[train_mask], edge_label[train_mask])
-
-    # 清零梯度
-    opt.zero_grad()
-
-    # 反向传播，计算梯度
-    loss.backward()
-
-    # 更新模型参数
-    opt.step()
-
-    # 每 100 轮输出一次训练准确度和 F1 score
-    if epoch % 100 == 0:
-        accuracy = compute_accuracy(pred[train_mask], edge_label[train_mask])
-        f1 = compute_f1_score(pred[train_mask], edge_label[train_mask])
-        print(f'Epoch {epoch}: Training acc: {accuracy}, F1 score: {f1}')
-
-    # 计算当前模型的 F1 score，如果高于最高的 F1 score，则保存模型和图
-    model.eval()  # 切换到评估模式
-    with th.no_grad():  # 禁用梯度计算
-        test_pred = model(G_test, node_features_test, edge_features_test)
-        current_f1_score = compute_f1_score(test_pred, actual)
-        if current_f1_score > best_f1_score:
-            best_f1_score = current_f1_score
-            th.save(model, best_model_file_path)
-            print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
-
 # 进行前向传播，获取测试预测
 # 将模型移动到设备上（GPU 或 CPU）
-best_model = th.load(best_model_file_path)
-best_model = best_model.to(device)
-best_model.eval()
-test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
+test_pred = model(G_test, node_features_test, edge_features_test).to(device)
 
 # 计算并打印前向传播所花费的时间
 elapsed = timeit.default_timer() - start_time
