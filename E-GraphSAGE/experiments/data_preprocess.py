@@ -205,7 +205,7 @@ def resample_nf_bot_iot(data):
 
 # 下采样NF-BoT-IoT数据集
 def resample_data(dataset):
-    data = frac_data(dataset, 0.02)
+    data = frac_data(dataset, 0.03)
 
     if dataset == 'NF-BoT-IoT':
         resample_nf_bot_iot(data)
