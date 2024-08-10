@@ -76,7 +76,7 @@ class SEAttention(nn.Module):
         return x * excitation
 
 class SAGELayer(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name="SE"):
+    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name=None):
         super(SAGELayer, self).__init__()
         # 初始化SAGELayer类
         # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
@@ -96,6 +96,8 @@ class SAGELayer(nn.Module):
             self.attention = SCSA(dim=ndim_out)
         elif attention_name == "CBAM":
             self.attention = CBAM(ndim_out)
+        else:
+            self.attention = None
 
     # 定义消息传递函数，edges是DGL中的边数据
     def message_func(self, edges):
@@ -112,8 +114,11 @@ class SAGELayer(nn.Module):
             # 执行消息传递和聚合操作，更新节点特征
             g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
 
-            aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
-            aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
+            if self.attention == None:
+                aggregated_feats = g.ndata['h_neigh']
+            else:
+                aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
+                aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
 
             # 将聚合后的特征和原始特征连接起来，通过线性层和激活函数进行转换
             g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
@@ -220,7 +225,7 @@ dataset = 'NF-BoT-IoT'
 attention 方法：
     - SE: Squeeze-and-Excitation
 '''
-attention_name = "SE"
+attention_name = None
 
 '''
 mlp 方法：
