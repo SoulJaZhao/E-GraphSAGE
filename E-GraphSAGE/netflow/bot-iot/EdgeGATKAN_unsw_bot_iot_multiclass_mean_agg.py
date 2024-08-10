@@ -47,98 +47,95 @@ epochs = 300
 best_model_file_path = 'EdgeGATKAN_multiclass_best_model.pth'
 
 # 尝试加载训练图和测试图，如果文件不存在则创建图并保存
-if os.path.exists(train_graph_file_path) and os.path.exists(test_graph_file_path):
-    G = load_graph(train_graph_file_path)
-    print("Train graph loaded from file.")
-else:
-    print("Train graph or test graph file not found. Creating new graph.")
-    # 读取 CSV 文件到 DataFrame
-    data = pd.read_csv('NF-BoT-IoT.csv')
 
-    # 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
-    # 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
-    data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(lambda x: socket.inet_ntoa(struct.pack('>I', random.randint(0xac100001, 0xac1f0001))))
+print("Train graph or test graph file not found. Creating new graph.")
+# 读取 CSV 文件到 DataFrame
+data = pd.read_csv('NF-BoT-IoT.csv')
 
-    # 将 IPV4_SRC_ADDR 列中的每个值转换为字符串类型
-    data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(str)
-    # 将 L4_SRC_PORT 列中的每个值转换为字符串类型
-    data['L4_SRC_PORT'] = data.L4_SRC_PORT.apply(str)
-    # 将 IPV4_DST_ADDR 列中的每个值转换为字符串类型
-    data['IPV4_DST_ADDR'] = data.IPV4_DST_ADDR.apply(str)
-    # 将 L4_DST_PORT 列中的每个值转换为字符串类型
-    data['L4_DST_PORT'] = data.L4_DST_PORT.apply(str)
+# 将 IPV4_SRC_ADDR 列中的每个 IP 地址替换为随机生成的 IP 地址
+# 这里生成的 IP 地址范围是从 172.16.0.1 到 172.31.0.1
+data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(lambda x: socket.inet_ntoa(struct.pack('>I', random.randint(0xac100001, 0xac1f0001))))
 
-    # 将 IPV4_SRC_ADDR 和 L4_SRC_PORT 列的值连接起来，中间用冒号分隔
-    data['IPV4_SRC_ADDR'] = data['IPV4_SRC_ADDR'] + ':' + data['L4_SRC_PORT']
-    # 将 IPV4_DST_ADDR 和 L4_DST_PORT 列的值连接起来，中间用冒号分隔
-    data['IPV4_DST_ADDR'] = data['IPV4_DST_ADDR'] + ':' + data['L4_DST_PORT']
+# 将 IPV4_SRC_ADDR 列中的每个值转换为字符串类型
+data['IPV4_SRC_ADDR'] = data.IPV4_SRC_ADDR.apply(str)
+# 将 L4_SRC_PORT 列中的每个值转换为字符串类型
+data['L4_SRC_PORT'] = data.L4_SRC_PORT.apply(str)
+# 将 IPV4_DST_ADDR 列中的每个值转换为字符串类型
+data['IPV4_DST_ADDR'] = data.IPV4_DST_ADDR.apply(str)
+# 将 L4_DST_PORT 列中的每个值转换为字符串类型
+data['L4_DST_PORT'] = data.L4_DST_PORT.apply(str)
 
-    # 删除不再需要的 L4_SRC_PORT 和 L4_DST_PORT 列
-    data.drop(columns=['L4_SRC_PORT', 'L4_DST_PORT'], inplace=True)
+# 将 IPV4_SRC_ADDR 和 L4_SRC_PORT 列的值连接起来，中间用冒号分隔
+data['IPV4_SRC_ADDR'] = data['IPV4_SRC_ADDR'] + ':' + data['L4_SRC_PORT']
+# 将 IPV4_DST_ADDR 和 L4_DST_PORT 列的值连接起来，中间用冒号分隔
+data['IPV4_DST_ADDR'] = data['IPV4_DST_ADDR'] + ':' + data['L4_DST_PORT']
 
-    # 删除不再需要的 Label 列
-    data.drop(columns=['Label'],inplace = True)
+# 删除不再需要的 L4_SRC_PORT 和 L4_DST_PORT 列
+data.drop(columns=['L4_SRC_PORT', 'L4_DST_PORT'], inplace=True)
 
-    # 将 Label 列重命名为 label
-    data.rename(columns={"Attack": "label"},inplace = True)
+# 删除不再需要的 Label 列
+data.drop(columns=['Label'],inplace = True)
 
-    le = LabelEncoder()
-    le.fit_transform(data.label.values)
-    data['label'] = le.transform(data['label'])
+# 将 Label 列重命名为 label
+data.rename(columns={"Attack": "label"},inplace = True)
 
-    # 将 label 列提取出来，保存到一个单独的变量中
-    label = data.label
+le = LabelEncoder()
+le.fit_transform(data.label.values)
+data['label'] = le.transform(data['label'])
 
-    # 从原始数据中删除 label 列
-    data.drop(columns=['label'], inplace=True)
+# 将 label 列提取出来，保存到一个单独的变量中
+label = data.label
 
-    # 创建 StandardScaler 对象，用于标准化数据
-    scaler = StandardScaler()
+# 从原始数据中删除 label 列
+data.drop(columns=['label'], inplace=True)
 
-    # 将 label 列重新加入到 data DataFrame 中，作为最后一列
-    data = pd.concat([data, label], axis=1)
+# 创建 StandardScaler 对象，用于标准化数据
+scaler = StandardScaler()
 
-    # 将数据分为训练集和测试集，按 70% 和 30% 的比例分配，保证 stratify 参数确保按标签分层抽样
-    X_train, X_test, y_train, y_test = train_test_split(
-        data, label, test_size=0.3, random_state=2024, stratify=label)
+# 将 label 列重新加入到 data DataFrame 中，作为最后一列
+data = pd.concat([data, label], axis=1)
 
-    # 创建 TargetEncoder 对象，用于对分类特征进行目标编码
-    encoder = ce.TargetEncoder(cols=['TCP_FLAGS', 'L7_PROTO', 'PROTOCOL'])
+# 将数据分为训练集和测试集，按 70% 和 30% 的比例分配，保证 stratify 参数确保按标签分层抽样
+X_train, X_test, y_train, y_test = train_test_split(
+    data, label, test_size=0.3, random_state=2024, stratify=label)
 
-    # 用训练集的特征和标签拟合编码器
-    encoder.fit(X_train, y_train)
+# 创建 TargetEncoder 对象，用于对分类特征进行目标编码
+encoder = ce.TargetEncoder(cols=['TCP_FLAGS', 'L7_PROTO', 'PROTOCOL'])
 
-    # 对训练集的特征进行编码转换
-    X_train = encoder.transform(X_train)
+# 用训练集的特征和标签拟合编码器
+encoder.fit(X_train, y_train)
 
-    # 需要标准化的列，去除掉 label 列
-    cols_to_norm = list(set(list(X_train.iloc[:, 2:].columns)) - set(['label']))
+# 对训练集的特征进行编码转换
+X_train = encoder.transform(X_train)
 
-    # 对需要标准化的列进行标准化
-    X_train[cols_to_norm] = scaler.fit_transform(X_train[cols_to_norm])
+# 需要标准化的列，去除掉 label 列
+cols_to_norm = list(set(list(X_train.iloc[:, 2:].columns)) - set(['label']))
 
-    # 将标准化后的列组合成列表，添加为新的列 'h'
-    X_train['h'] = X_train[cols_to_norm].values.tolist()
+# 对需要标准化的列进行标准化
+X_train[cols_to_norm] = scaler.fit_transform(X_train[cols_to_norm])
 
-    # 从 pandas DataFrame 中创建一个无向多重图
-    # 边的数据包含 'h' 和 'label' 列
-    G = nx.from_pandas_edgelist(X_train, "IPV4_SRC_ADDR", "IPV4_DST_ADDR", ['h', 'label'], create_using=nx.MultiGraph())
+# 将标准化后的列组合成列表，添加为新的列 'h'
+X_train['h'] = X_train[cols_to_norm].values.tolist()
 
-    # 将无向图转换为有向图
-    G = G.to_directed()
+# 从 pandas DataFrame 中创建一个无向多重图
+# 边的数据包含 'h' 和 'label' 列
+G = nx.from_pandas_edgelist(X_train, "IPV4_SRC_ADDR", "IPV4_DST_ADDR", ['h', 'label'], create_using=nx.MultiGraph())
 
-    # 将 NetworkX 图转换为 DGL 图，边的数据包含 'h' 和 'label' 属性
-    G = from_networkx(G, edge_attrs=['h', 'label'])
+# 将无向图转换为有向图
+G = G.to_directed()
 
-    # 为每个节点的 'h' 属性赋值，初始值为全 1 的张量，维度与边的 'h' 属性相同
-    G.ndata['h'] = th.ones(G.num_nodes(), G.edata['h'].shape[1])
+# 将 NetworkX 图转换为 DGL 图，边的数据包含 'h' 和 'label' 属性
+G = from_networkx(G, edge_attrs=['h', 'label'])
 
-    # 为每条边添加 'train_mask' 属性，初始值为 True，表示这些边用于训练
-    G.edata['train_mask'] = th.ones(len(G.edata['h']), dtype=th.bool)
+# 为每个节点的 'h' 属性赋值，初始值为全 1 的张量，维度与边的 'h' 属性相同
+G.ndata['h'] = th.ones(G.num_nodes(), G.edata['h'].shape[1])
 
-    # 保存图 G 到指定路径
-    save_graph(G, train_graph_file_path)
-    print("Train graph created and saved to file.")
+# 为每条边添加 'train_mask' 属性，初始值为 True，表示这些边用于训练
+G.edata['train_mask'] = th.ones(len(G.edata['h']), dtype=th.bool)
+
+# 保存图 G 到指定路径
+save_graph(G, train_graph_file_path)
+print("Train graph created and saved to file.")
 
 # 定义计算准确度的函数
 def compute_accuracy(pred, labels):
@@ -251,42 +248,37 @@ opt = Adam(model.parameters())
 best_f1_score = 0.0
 
 
-if os.path.exists(test_graph_file_path):
-    G_test = load_graph(test_graph_file_path)
-    actual = np.load(test_labels_file_path)
-    print("Test graph loaded from file.")
-else:
-    print("Test graph file not found. Creating new test graph.")
-    # 对测试集进行目标编码转换
-    X_test = encoder.transform(X_test)
+print("Test graph file not found. Creating new test graph.")
+# 对测试集进行目标编码转换
+X_test = encoder.transform(X_test)
 
-    # 对需要标准化的列进行标准化
-    X_test[cols_to_norm] = scaler.transform(X_test[cols_to_norm])
+# 对需要标准化的列进行标准化
+X_test[cols_to_norm] = scaler.transform(X_test[cols_to_norm])
 
-    # 将标准化后的列组合成列表，添加为新的列 'h'
-    X_test['h'] = X_test[cols_to_norm].values.tolist()
+# 将标准化后的列组合成列表，添加为新的列 'h'
+X_test['h'] = X_test[cols_to_norm].values.tolist()
 
-    # 从 pandas DataFrame 中创建一个无向多重图
-    # 边的数据包含 'h' 和 'label' 列
-    G_test = nx.from_pandas_edgelist(X_test, "IPV4_SRC_ADDR", "IPV4_DST_ADDR", ['h', 'label'],
-                                     create_using=nx.MultiGraph())
+# 从 pandas DataFrame 中创建一个无向多重图
+# 边的数据包含 'h' 和 'label' 列
+G_test = nx.from_pandas_edgelist(X_test, "IPV4_SRC_ADDR", "IPV4_DST_ADDR", ['h', 'label'],
+                                    create_using=nx.MultiGraph())
 
-    # 将无向图转换为有向图
-    G_test = G_test.to_directed()
+# 将无向图转换为有向图
+G_test = G_test.to_directed()
 
-    # 将 NetworkX 图转换为 DGL 图，边的数据包含 'h' 和 'label' 属性
-    G_test = from_networkx(G_test, edge_attrs=['h', 'label'])
+# 将 NetworkX 图转换为 DGL 图，边的数据包含 'h' 和 'label' 属性
+G_test = from_networkx(G_test, edge_attrs=['h', 'label'])
 
-    # 从 G_test 的边数据中取出 'label' 并删除
-    actual = G_test.edata.pop('label')
+# 从 G_test 的边数据中取出 'label' 并删除
+actual = G_test.edata.pop('label')
 
-    # 为 G_test 的每个节点设置 'feature' 属性，初始值为全 1 的张量，维度与训练图中的节点特征相同
-    G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[1])
+# 为 G_test 的每个节点设置 'feature' 属性，初始值为全 1 的张量，维度与训练图中的节点特征相同
+G_test.ndata['feature'] = th.ones(G_test.num_nodes(), G.ndata['h'].shape[1])
 
-    # 保存测试图 G_test 到指定路径
-    save_graph(G_test, test_graph_file_path)
-    np.save(test_labels_file_path, actual)
-    print("Test graph created and saved to file.")
+# 保存测试图 G_test 到指定路径
+save_graph(G_test, test_graph_file_path)
+np.save(test_labels_file_path, actual)
+print("Test graph created and saved to file.")
 
 # 将测试图移动到设备（GPU 或 CPU）
 G_test = G_test.to(device)
