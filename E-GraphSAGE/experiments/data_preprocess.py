@@ -80,6 +80,8 @@ def frac_data(dataset, frac):
         data = get_data(dataset)
     elif dataset == 'NF-BoT-IoT-v2':
         data = get_data(dataset)
+    elif dataset == 'NF-ToN-IoT':
+        data = get_data(dataset)
     else:
         raise ValueError("Invalid dataset name.")
 
@@ -205,11 +207,13 @@ def resample_nf_bot_iot(data):
 
 # 下采样NF-BoT-IoT数据集
 def resample_data(dataset):
-    data = frac_data(dataset, 0.03)
+    data = frac_data(dataset, 0.3)
 
     if dataset == 'NF-BoT-IoT':
         resample_nf_bot_iot(data)
     elif dataset == 'NF-BoT-IoT-v2':
+        resample_nf_bot_iot(data)
+    elif dataset == 'NF-ToN-IoT':
         resample_nf_bot_iot(data)
     else:
         raise ValueError("Invalid dataset name.")
@@ -217,7 +221,7 @@ def resample_data(dataset):
 
 
 if __name__ == '__main__':
-    dataset = 'NF-BoT-IoT-v2'
+    dataset = 'NF-ToN-IoT'
     resample_data(dataset)
 
 

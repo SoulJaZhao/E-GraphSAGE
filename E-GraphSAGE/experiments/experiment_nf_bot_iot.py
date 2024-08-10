@@ -166,7 +166,7 @@ class MLPPredictor(nn.Module):
             # 第二层 KANLinear，输出维度为指定的类别数
             self.fc2 = KANLinear(in_features, out_classes)
         elif mlp_name == "MLP":
-            self.W = KANLinear(in_features * 2, out_classes)
+            self.W = nn.Linear(in_features * 2, out_classes)
 
 
 
@@ -204,13 +204,13 @@ class MLPPredictor(nn.Module):
 
 # 定义一个Model类，继承自nn.Module
 class Model(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, output_classes):
         super().__init__()
         # 初始化Model类
         # 创建一个SAGE模型，用于图神经网络层
         self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout)
         # 创建一个MLPPredictor模型，用于边的预测
-        self.pred = MLPPredictor(ndim_out, 5)
+        self.pred = MLPPredictor(ndim_out, output_classes)
 
     # 定义前向传播函数
     def forward(self, g, nfeats, efeats):
@@ -220,7 +220,7 @@ class Model(nn.Module):
         return self.pred(g, h)
 
 # 定义实验参数
-dataset = 'NF-BoT-IoT-v2'
+dataset = 'NF-ToN-IoT'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation
@@ -233,6 +233,11 @@ mlp 方法：
     - MLP: MLP
 '''
 mlp_name = "MLP"
+
+if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
+    output_classes = 5
+else:
+    output_classes = 10
 
 epochs = 500
 best_model_file_path = f'{attention_name}_{mlp_name}_{dataset}_best_model.pth'
@@ -300,7 +305,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = Model(G.ndata['h'].shape[2], 128, G.ndata['h'].shape[2], F.relu, 0.2).to(device)
+model = Model(G.ndata['h'].shape[2], 128, G.ndata['h'].shape[2], F.relu, 0.2, output_classes).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
