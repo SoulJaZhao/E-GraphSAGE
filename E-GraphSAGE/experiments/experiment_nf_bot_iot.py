@@ -220,7 +220,7 @@ class Model(nn.Module):
         return self.pred(g, h)
 
 # 定义实验参数
-dataset = 'NF-BoT-IoT'
+dataset = 'NF-BoT-IoT-v2'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation
