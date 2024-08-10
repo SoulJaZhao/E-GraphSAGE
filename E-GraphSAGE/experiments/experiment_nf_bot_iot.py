@@ -86,11 +86,11 @@ class SAGELayer(nn.Module):
             # 执行消息传递和聚合操作，更新节点特征
             g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
 
-            # aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
-            # aggregated_feats = self.se_attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
+            aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
+            aggregated_feats = self.se_attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
 
             # 将聚合后的特征和原始特征连接起来，通过线性层和激活函数进行转换
-            g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], g.ndata['h_neigh']], 2)))
+            g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
             # 返回更新后的节点特征
             return g.ndata['h']
 
