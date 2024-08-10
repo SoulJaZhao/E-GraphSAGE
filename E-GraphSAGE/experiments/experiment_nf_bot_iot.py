@@ -1,5 +1,4 @@
 import json
-import os
 import random
 import socket
 import struct
@@ -22,7 +21,24 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils import class_weight
 from torch.optim import Adam
 from tqdm import tqdm
+
+import sys
+import os
+
+# 获取当前文件的绝对路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 构建 module 目录的绝对路径（上一级目录的 module 文件夹）
+module_path = os.path.abspath(os.path.join(current_dir, '../module'))
+
+# 添加 module 目录到 sys.path
+sys.path.append(module_path)
 from efficientKan import KANLinear
+from CPCA2d import CPCABlock
+from SKNet import SKAttention
+from SCSA import SCSA
+from CBAM import CBAM
+
 import pickle
 from data_preprocess import get_train_graph_file_path, get_test_graph_file_path, get_label_encoder_file_path, get_test_labels_file_path
 warnings.filterwarnings("ignore")
@@ -60,7 +76,7 @@ class SEAttention(nn.Module):
         return x * excitation
 
 class SAGELayer(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation):
+    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name="SE"):
         super(SAGELayer, self).__init__()
         # 初始化SAGELayer类
         # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
@@ -69,7 +85,17 @@ class SAGELayer(nn.Module):
         self.W_apply = nn.Linear(ndim_in + ndim_out, ndim_out)
         # 保存激活函数
         self.activation = activation
-        self.se_attention = SEAttention(ndim_out)
+
+        if attention_name == "SE":
+            self.attention = SEAttention(ndim_out)
+        elif attention_name == "SK":
+            self.attention = SKAttention(channel=ndim_out, reduction=8)
+        elif attention_name == "CPCA":
+            self.attention = CPCABlock(in_channels=ndim_out, out_channels=ndim_out, channelAttention_reduce=4)
+        elif attention_name == "SCSA":
+            self.attention = SCSA(dim=ndim_out)
+        elif attention_name == "CBAM":
+            self.attention = CBAM(ndim_out)
 
     # 定义消息传递函数，edges是DGL中的边数据
     def message_func(self, edges):
@@ -87,7 +113,7 @@ class SAGELayer(nn.Module):
             g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
 
             aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
-            aggregated_feats = self.se_attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
+            aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
 
             # 将聚合后的特征和原始特征连接起来，通过线性层和激活函数进行转换
             g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
@@ -126,14 +152,14 @@ class MLPPredictor(nn.Module):
         super().__init__()
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
-        self.W = KANLinear(in_features * 2, out_classes)
+        # self.W = KANLinear(in_features * 2, out_classes)
 
-        # # 第一层 KANLinear，输入维度为两倍的节点特征维度
-        # self.fc1 = KANLinear(in_features * 2, in_features)
-        # # 激活函数
-        # self.relu = nn.ReLU()
-        # # 第二层 KANLinear，输出维度为指定的类别数
-        # self.fc2 = KANLinear(in_features, out_classes)
+        # 第一层 KANLinear，输入维度为两倍的节点特征维度
+        self.fc1 = KANLinear(in_features * 2, in_features)
+        # 激活函数
+        self.relu = nn.ReLU()
+        # 第二层 KANLinear，输出维度为指定的类别数
+        self.fc2 = KANLinear(in_features, out_classes)
 
     # 定义边应用函数，edges是DGL中的边数据
     def apply_edges(self, edges):
@@ -142,15 +168,15 @@ class MLPPredictor(nn.Module):
         # 获取目标节点特征
         h_v = edges.dst['h']
         # 将源节点和目标节点的特征连接起来，通过线性层转换
-        score = self.W(th.cat([h_u, h_v], 1))
+        #score = self.W(th.cat([h_u, h_v], 1))
 
-        # # 将源节点和目标节点的特征连接起来，通过线性层转换
-        # combined_features = th.cat([h_u, h_v], 1)
+        # 将源节点和目标节点的特征连接起来，通过线性层转换
+        combined_features = th.cat([h_u, h_v], 1)
 
-        # # 通过两层 KANLinear 进行特征转换
-        # x = self.fc1(combined_features)
-        # x = self.relu(x)
-        # score = self.fc2(x)
+        # 通过两层 KANLinear 进行特征转换
+        x = self.fc1(combined_features)
+        x = self.relu(x)
+        score = self.fc2(x)
 
         # 返回包含预测得分的字典
         return {'score': score}
@@ -185,9 +211,22 @@ class Model(nn.Module):
 
 # 定义实验参数
 dataset = 'NF-BoT-IoT'
+'''
+attention 方法：
+    - SE: Squeeze-and-Excitation
+'''
+attention_name = "SE"
+
+'''
+mlp 方法：
+    - KAN: KAN
+    - mlp: MLP
+'''
+mlp_name = "KAN"
+
 epochs = 500
-best_model_file_path = f'SEKAN_{dataset}_best_model.pth'
-report_file_path = f'./reports/SEKAN_{dataset}_report.json'
+best_model_file_path = f'{attention_name}_{mlp_name}_{dataset}_best_model.pth'
+report_file_path = f'./reports/{attention_name}_{mlp_name}_{dataset}_report.json'
 
 # 获取图
 G = load_graph(get_train_graph_file_path(dataset))
