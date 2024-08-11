@@ -45,6 +45,7 @@ from MSAF2d import MSAF
 from SFFusion2d import SqueezeAndExciteFusionAdd
 from TIF import TIF
 from WCMF import WCMF
+from GatedFusion import gatedFusion
 
 import pickle
 from data_preprocess import get_train_graph_file_path, get_test_graph_file_path, get_label_encoder_file_path, get_test_labels_file_path
@@ -165,6 +166,7 @@ class MLPPredictor(nn.Module):
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
         self.mlp_name = mlp_name
+        self.fusion_name = fusion_name
 
         if fusion_name == "DFF":
             self.fusion = DFF(in_features)
@@ -178,6 +180,8 @@ class MLPPredictor(nn.Module):
             self.fusion = TIF(dim_s=in_features, dim_l=in_features)
         elif fusion_name == "WCMF":
             self.fusion = WCMF(channel=in_features)
+        elif fusion_name == "GATE":
+            self.fusion = gatedFusion(in_features)
         else:
             self.fusion = None
 
@@ -200,8 +204,12 @@ class MLPPredictor(nn.Module):
 
         # 执行特征融合
         if self.fusion != None:
-            input1 = h_u.view(h_u.size(0), -1, 1, 1)
-            input2 = h_v.view(h_v.size(0), -1, 1, 1)
+            if self.fusion_name == "GATE":
+                input1 = h_u.view(h_u.size(0), 1, 1, -1)
+                input2 = h_v.view(h_v.size(0), 1, 1, -1)
+            else:
+                input1 = h_u.view(h_u.size(0), -1, 1, 1)
+                input2 = h_v.view(h_v.size(0), -1, 1, 1)
             h_u = self.fusion(input1, input2).view(h_u.size(0), -1)
 
         # 将源节点和目标节点的特征连接起来，通过线性层转换
@@ -257,7 +265,7 @@ attention 方法：
     - SCSA: Spatial and Channel Squeeze & Excitation
     - CBAM: Convolutional Block Attention Module
 '''
-attention_name = None
+attention_name = "CPCA"
 
 '''
 fusion 方法:
@@ -266,6 +274,7 @@ fusion 方法:
     - SFF: SFFusion
     - TIF: TIF
     - WCMF: WCMF
+    - GATE: GatedFusion
 '''
 fusion_name = "TIF"
 
