@@ -39,11 +39,9 @@ from SKNet import SKAttention
 from SCSA import SCSA
 from CBAM import CBAM
 
-from BFAM import BFAM
 from DFF2d import DFF
-from EFF2d import EFF
+from SDM2d import SDM
 from MSAF2d import MSAF
-from SDM2d import SDC
 from SFFusion2d import SqueezeAndExciteFusionAdd
 from TIF import TIF
 from WCMF import WCMF
@@ -170,16 +168,14 @@ class MLPPredictor(nn.Module):
 
         if fusion_name == "DFF":
             self.fusion = DFF(in_features)
-        elif fusion_name == "EFF":
-            self.fusion = EFF(in_dim=in_features, is_bottom=False)
         elif fusion_name == "MSAF":
             self.fusion = MSAF(channels=in_features, r=4)
-        elif fusion_name == "SDC":
+        elif fusion_name == "SDM":
             self.fusion = SDM(in_channel=in_features, guidance_channels=in_features)
         elif fusion_name == "SFF":
             self.fusion = SqueezeAndExciteFusionAdd(channels_in=in_features)
         elif fusion_name == "TIF":
-            self.fusion = TIF(in_features)
+            self.fusion = TIF(dim_s=in_features, dim_l=in_features)
         elif fusion_name == "WCMF":
             self.fusion = WCMF(channel=in_features)
         else:
@@ -252,7 +248,7 @@ class Model(nn.Module):
         return self.pred(g, h)
 
 # 定义实验参数
-dataset = 'NF-ToN-IoT'
+dataset = 'NF-BoT-IoT'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation
@@ -266,14 +262,12 @@ attention_name = None
 '''
 fusion 方法:
     - DFF: DFF
-    - EFF: EFF
-    - MSAF: MSAF
-    - SDC: SDC
+    - SDM: SDM
     - SFF: SFFusion
     - TIF: TIF
     - WCMF: WCMF
 '''
-fusion_name = "DFF"
+fusion_name = "TIF"
 
 '''
 mlp 方法：
