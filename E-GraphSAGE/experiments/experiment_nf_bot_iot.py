@@ -39,6 +39,16 @@ from SKNet import SKAttention
 from SCSA import SCSA
 from CBAM import CBAM
 
+from BFAM import BFAM
+from CGAFusion import CGAFusion
+from DFF2d import DFF
+from EFF2d import EFF
+from MSAF2d import MSAF
+from SDM2d import SDC
+from SFFusion2d import SqueezeAndExciteFusionAdd
+from TIF import TIF
+from WCMF import WCMF
+
 import pickle
 from data_preprocess import get_train_graph_file_path, get_test_graph_file_path, get_label_encoder_file_path, get_test_labels_file_path
 warnings.filterwarnings("ignore")
@@ -76,7 +86,7 @@ class SEAttention(nn.Module):
         return x * excitation
 
 class SAGELayer(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name=None):
+    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name, fusion_name):
         super(SAGELayer, self).__init__()
         # 初始化SAGELayer类
         # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
@@ -99,6 +109,25 @@ class SAGELayer(nn.Module):
         else:
             self.attention = None
 
+        if fusion_name == "CGAF":
+            self.fusion = CGAFusion(ndim_out)
+        elif fusion_name == "DFF":
+            self.fusion = DFF(ndim_out)
+        elif fusion_name == "EFF":
+            self.fusion = EFF(in_dim=ndim_out, is_bottom=False)
+        elif fusion_name == "MSAF":
+            self.fusion = MSAF(channels=ndim_out, r=4)
+        elif fusion_name == "SDC":
+            self.fusion = SDM(in_channel=ndim_out, guidance_channels=ndim_out)
+        elif fusion_name == "SFF":
+            self.fusion = SqueezeAndExciteFusionAdd(channels_in=ndim_out)
+        elif fusion_name == "TIF":
+            self.fusion = TIF(ndim_out)
+        elif fusion_name == "WCMF":
+            self.fusion = WCMF(channel=ndim_out)
+        else:
+            self.fusion = None
+
     # 定义消息传递函数，edges是DGL中的边数据
     def message_func(self, edges):
         # 将源节点特征和边特征连接起来，并通过线性层转换
@@ -114,28 +143,35 @@ class SAGELayer(nn.Module):
             # 执行消息传递和聚合操作，更新节点特征
             g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
 
+            # 先进行消息聚合，然后执行注意力机制
             if self.attention == None:
                 aggregated_feats = g.ndata['h_neigh']
             else:
                 aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
                 aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
 
-            # 将聚合后的特征和原始特征连接起来，通过线性层和激活函数进行转换
+            # 执行特征融合
+            if self.fusion != None:
+                input1 = g.ndata['h'].view(g.ndata['h'].size(0), -1, 1, 1)
+                input2 = aggregated_feats.view(aggregated_feats.size(0), -1, 1, 1)
+                aggregated_feats = self.fusion(input1, input2).view(g.ndata['h'].size(0), 1, -1)
+
+            # 将融合后的特征与原始特征连接，并通过线性层进行转换和激活
             g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
             # 返回更新后的节点特征
             return g.ndata['h']
 
 # 定义一个SAGE类，继承自nn.Module
 class SAGE(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name):
         super(SAGE, self).__init__()
         # 初始化SAGE类
         # 创建一个ModuleList来存储SAGELayer层
         self.layers = nn.ModuleList()
         # 添加第一层SAGELayer，输入维度为ndim_in，输出维度为128
-        self.layers.append(SAGELayer(ndim_in, edim, 128, activation))
+        self.layers.append(SAGELayer(ndim_in, edim, 128, activation, attention_name, fusion_name))
         # 添加第二层SAGELayer，输入维度为128，输出维度为ndim_out
-        self.layers.append(SAGELayer(128, edim, ndim_out, activation))
+        self.layers.append(SAGELayer(128, edim, ndim_out, activation, attention_name, fusion_name))
         # 定义dropout层，使用指定的dropout率
         self.dropout = nn.Dropout(p=dropout)
 
@@ -153,7 +189,7 @@ class SAGE(nn.Module):
 
 # 定义一个MLPPredictor类，继承自nn.Module
 class MLPPredictor(nn.Module):
-    def __init__(self, in_features, out_classes, mlp_name="MLP"):
+    def __init__(self, in_features, out_classes, mlp_name):
         super().__init__()
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
@@ -204,13 +240,13 @@ class MLPPredictor(nn.Module):
 
 # 定义一个Model类，继承自nn.Module
 class Model(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, output_classes):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name, mlp_name, output_classes):
         super().__init__()
         # 初始化Model类
         # 创建一个SAGE模型，用于图神经网络层
-        self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout)
+        self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name)
         # 创建一个MLPPredictor模型，用于边的预测
-        self.pred = MLPPredictor(ndim_out, output_classes)
+        self.pred = MLPPredictor(ndim_out, output_classes, mlp_name)
 
     # 定义前向传播函数
     def forward(self, g, nfeats, efeats):
@@ -224,8 +260,25 @@ dataset = 'NF-ToN-IoT'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation
+    - SK: Selective Kernel
+    - CPCA: Channel-wise PCA
+    - SCSA: Spatial and Channel Squeeze & Excitation
+    - CBAM: Convolutional Block Attention Module
 '''
 attention_name = None
+
+'''
+fusion 方法:
+    - CGAF: CGAFusion
+    - DFF: DFF
+    - EFF: EFF
+    - MSAF: MSAF
+    - SDC: SDC
+    - SFF: SFFusion
+    - TIF: TIF
+    - WCMF: WCMF
+'''
+fusion_name = None
 
 '''
 mlp 方法：
@@ -240,8 +293,8 @@ else:
     output_classes = 10
 
 epochs = 500
-best_model_file_path = f'{attention_name}_{mlp_name}_{dataset}_best_model.pth'
-report_file_path = f'./reports/{attention_name}_{mlp_name}_{dataset}_report.json'
+best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
+report_file_path = f'./reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
 
 # 获取图
 G = load_graph(get_train_graph_file_path(dataset))
@@ -305,7 +358,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = Model(G.ndata['h'].shape[2], 128, G.ndata['h'].shape[2], F.relu, 0.2, output_classes).to(device)
+model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=128, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2, attention_name=attention_name, fusion_name=fusion_name, mlp_name=mlp_name, output_classes=output_classes).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)

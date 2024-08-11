@@ -76,15 +76,7 @@ def load_graph(file_path):
     return dgl.load_graphs(file_path)[0][0]
 
 def frac_data(dataset, frac):
-    if dataset == 'NF-BoT-IoT':
-        data = get_data(dataset)
-    elif dataset == 'NF-BoT-IoT-v2':
-        data = get_data(dataset)
-    elif dataset == 'NF-ToN-IoT':
-        data = get_data(dataset)
-    else:
-        raise ValueError("Invalid dataset name.")
-
+    data = get_data(dataset)
     data = data.groupby(by='Attack').sample(frac=frac, random_state=2024)
     print("Resampled data shape:", data.shape)
     return data
@@ -207,21 +199,13 @@ def resample_nf_bot_iot(data):
 
 # 下采样NF-BoT-IoT数据集
 def resample_data(dataset):
-    data = frac_data(dataset, 0.3)
-
-    if dataset == 'NF-BoT-IoT':
-        resample_nf_bot_iot(data)
-    elif dataset == 'NF-BoT-IoT-v2':
-        resample_nf_bot_iot(data)
-    elif dataset == 'NF-ToN-IoT':
-        resample_nf_bot_iot(data)
-    else:
-        raise ValueError("Invalid dataset name.")
+    data = frac_data(dataset, 0.1)
+    resample_nf_bot_iot(data)
     print("Train graph or test graph file not found. Creating new graph.")
 
 
 if __name__ == '__main__':
-    dataset = 'NF-ToN-IoT'
+    dataset = 'NF-ToN-IoT-v2'
     resample_data(dataset)
 
 
