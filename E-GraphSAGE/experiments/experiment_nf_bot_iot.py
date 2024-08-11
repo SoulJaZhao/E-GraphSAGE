@@ -206,7 +206,7 @@ class MLPPredictor(nn.Module):
         if self.fusion != None:
             input1 = h_u.view(h_u.size(0), -1, 1, 1)
             input2 = h_v.view(h_v.size(0), -1, 1, 1)
-            h_u = self.fusion(input1, input2).view(h_u.size(0), 1, -1)
+            h_u = self.fusion(input1, input2).view(h_u.size(0), -1)
 
         # 将源节点和目标节点的特征连接起来，通过线性层转换
         if self.mlp_name == "KAN":
