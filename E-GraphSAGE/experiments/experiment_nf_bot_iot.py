@@ -40,7 +40,6 @@ from SCSA import SCSA
 from CBAM import CBAM
 
 from BFAM import BFAM
-from CGAFusion import CGAFusion
 from DFF2d import DFF
 from EFF2d import EFF
 from MSAF2d import MSAF
@@ -86,7 +85,7 @@ class SEAttention(nn.Module):
         return x * excitation
 
 class SAGELayer(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name, fusion_name):
+    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name):
         super(SAGELayer, self).__init__()
         # 初始化SAGELayer类
         # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
@@ -109,25 +108,6 @@ class SAGELayer(nn.Module):
         else:
             self.attention = None
 
-        if fusion_name == "CGAF":
-            self.fusion = CGAFusion(ndim_out)
-        elif fusion_name == "DFF":
-            self.fusion = DFF(ndim_out)
-        elif fusion_name == "EFF":
-            self.fusion = EFF(in_dim=ndim_out, is_bottom=False)
-        elif fusion_name == "MSAF":
-            self.fusion = MSAF(channels=ndim_out, r=4)
-        elif fusion_name == "SDC":
-            self.fusion = SDM(in_channel=ndim_out, guidance_channels=ndim_out)
-        elif fusion_name == "SFF":
-            self.fusion = SqueezeAndExciteFusionAdd(channels_in=ndim_out)
-        elif fusion_name == "TIF":
-            self.fusion = TIF(ndim_out)
-        elif fusion_name == "WCMF":
-            self.fusion = WCMF(channel=ndim_out)
-        else:
-            self.fusion = None
-
     # 定义消息传递函数，edges是DGL中的边数据
     def message_func(self, edges):
         # 将源节点特征和边特征连接起来，并通过线性层转换
@@ -149,13 +129,6 @@ class SAGELayer(nn.Module):
             else:
                 aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
                 aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
-
-            # 执行特征融合
-            if self.fusion != None:
-                input1 = g.ndata['h'].view(g.ndata['h'].size(0), -1, 1, 1)
-                input2 = aggregated_feats.view(aggregated_feats.size(0), -1, 1, 1)
-                aggregated_feats = self.fusion(input1, input2).view(g.ndata['h'].size(0), 1, -1)
-
             # 将融合后的特征与原始特征连接，并通过线性层进行转换和激活
             g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
             # 返回更新后的节点特征
@@ -163,15 +136,15 @@ class SAGELayer(nn.Module):
 
 # 定义一个SAGE类，继承自nn.Module
 class SAGE(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name):
         super(SAGE, self).__init__()
         # 初始化SAGE类
         # 创建一个ModuleList来存储SAGELayer层
         self.layers = nn.ModuleList()
         # 添加第一层SAGELayer，输入维度为ndim_in，输出维度为128
-        self.layers.append(SAGELayer(ndim_in, edim, 128, activation, attention_name, fusion_name))
+        self.layers.append(SAGELayer(ndim_in, edim, 128, activation, attention_name))
         # 添加第二层SAGELayer，输入维度为128，输出维度为ndim_out
-        self.layers.append(SAGELayer(128, edim, ndim_out, activation, attention_name, fusion_name))
+        self.layers.append(SAGELayer(128, edim, ndim_out, activation, attention_name))
         # 定义dropout层，使用指定的dropout率
         self.dropout = nn.Dropout(p=dropout)
 
@@ -189,11 +162,29 @@ class SAGE(nn.Module):
 
 # 定义一个MLPPredictor类，继承自nn.Module
 class MLPPredictor(nn.Module):
-    def __init__(self, in_features, out_classes, mlp_name):
+    def __init__(self, in_features, out_classes, fusion_name, mlp_name):
         super().__init__()
         # 初始化MLPPredictor类
         # 定义线性层，输入维度为两倍的节点特征维度，输出维度为指定的类别数
         self.mlp_name = mlp_name
+
+        if fusion_name == "DFF":
+            self.fusion = DFF(in_features)
+        elif fusion_name == "EFF":
+            self.fusion = EFF(in_dim=in_features, is_bottom=False)
+        elif fusion_name == "MSAF":
+            self.fusion = MSAF(channels=in_features, r=4)
+        elif fusion_name == "SDC":
+            self.fusion = SDM(in_channel=in_features, guidance_channels=in_features)
+        elif fusion_name == "SFF":
+            self.fusion = SqueezeAndExciteFusionAdd(channels_in=in_features)
+        elif fusion_name == "TIF":
+            self.fusion = TIF(in_features)
+        elif fusion_name == "WCMF":
+            self.fusion = WCMF(channel=in_features)
+        else:
+            self.fusion = None
+
         if mlp_name == "KAN":
             # 第一层 KANLinear，输入维度为两倍的节点特征维度
             self.fc1 = KANLinear(in_features * 2, in_features)
@@ -204,14 +195,19 @@ class MLPPredictor(nn.Module):
         elif mlp_name == "MLP":
             self.W = nn.Linear(in_features * 2, out_classes)
 
-
-
     # 定义边应用函数，edges是DGL中的边数据
     def apply_edges(self, edges):
         # 获取源节点特征
         h_u = edges.src['h']
         # 获取目标节点特征
         h_v = edges.dst['h']
+
+        # 执行特征融合
+        if self.fusion != None:
+            input1 = h_u.view(h_u.size(0), -1, 1, 1)
+            input2 = h_v.view(h_v.size(0), -1, 1, 1)
+            h_u = self.fusion(input1, input2).view(h_u.size(0), 1, -1)
+
         # 将源节点和目标节点的特征连接起来，通过线性层转换
         if self.mlp_name == "KAN":
             # 将源节点和目标节点的特征连接起来，通过线性层转换
@@ -244,9 +240,9 @@ class Model(nn.Module):
         super().__init__()
         # 初始化Model类
         # 创建一个SAGE模型，用于图神经网络层
-        self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name)
+        self.gnn = SAGE(ndim_in, ndim_out, edim, activation, dropout, attention_name)
         # 创建一个MLPPredictor模型，用于边的预测
-        self.pred = MLPPredictor(ndim_out, output_classes, mlp_name)
+        self.pred = MLPPredictor(ndim_out, output_classes, fusion_name, mlp_name)
 
     # 定义前向传播函数
     def forward(self, g, nfeats, efeats):
@@ -269,7 +265,6 @@ attention_name = None
 
 '''
 fusion 方法:
-    - CGAF: CGAFusion
     - DFF: DFF
     - EFF: EFF
     - MSAF: MSAF
@@ -278,7 +273,7 @@ fusion 方法:
     - TIF: TIF
     - WCMF: WCMF
 '''
-fusion_name = None
+fusion_name = "DFF"
 
 '''
 mlp 方法：
@@ -292,7 +287,7 @@ if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
 else:
     output_classes = 10
 
-epochs = 500
+epochs = 1000
 best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
 report_file_path = f'./reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
 

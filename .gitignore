@@ -4,3 +4,6 @@ NF-BoT-IoT-v2_train_graph.dgl
 NF-BoT-IoT-v2_le_label.pkl
 NF-BoT-IoT-v2_test_graph.dgl
 NF-BoT-IoT-v2_test_labels.npy
+NF-ToN-IoT-v2_test_graph.dgl
+NF-ToN-IoT-v2_test_labels.npy
+NF-ToN-IoT-v2_train_graph.dgl
