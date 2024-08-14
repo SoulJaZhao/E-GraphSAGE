@@ -265,7 +265,7 @@ attention 方法：
     - SCSA: Spatial and Channel Squeeze & Excitation
     - CBAM: Convolutional Block Attention Module
 '''
-attention_name = "CPCA"
+attention_name = "SK"
 
 '''
 fusion 方法:
@@ -276,7 +276,7 @@ fusion 方法:
     - WCMF: WCMF
     - GATE: GatedFusion
 '''
-fusion_name = "TIF"
+fusion_name = "GATE"
 
 '''
 mlp 方法：
@@ -287,12 +287,24 @@ mlp_name = "MLP"
 
 if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
     output_classes = 5
+elif dataset == "NF-CSE-CIC-IDS2018-v2":
+    output_classes = 15
 else:
     output_classes = 10
 
 epochs = 1000
 best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
 report_file_path = f'./reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
+test_pred_file_path = f'./predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
+
+# 打印出所有实验配置
+print(f'Dataset: {dataset}')
+print(f'Attention: {attention_name}')
+print(f'Fusion: {fusion_name}')
+print(f'MLP: {mlp_name}')
+print(f'Epochs: {epochs}')
+print(f'Best model file path: {best_model_file_path}')
+print(f'Report file path: {report_file_path}')
 
 # 获取图
 G = load_graph(get_train_graph_file_path(dataset))
@@ -421,6 +433,9 @@ best_model = th.load(best_model_file_path)
 best_model = best_model.to(device)
 best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
+
+# 保存test_pred到本地
+th.save(test_pred, test_pred_file_path)
 
 # 计算并打印前向传播所花费的时间
 elapsed = timeit.default_timer() - start_time

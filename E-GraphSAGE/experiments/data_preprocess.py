@@ -35,6 +35,7 @@ warnings.filterwarnings("ignore")
     NF-BoT-IoT-v2
     NF-ToN-IoT
     NF-ToN-IoT-v2
+    NF-CSE-CIC-IDS2018-v2
 '''
 
 
@@ -48,6 +49,8 @@ def get_data(dataset):
         data = pd.read_csv('NF-ToN-IoT.csv')
     elif dataset == 'NF-ToN-IoT-v2':
         data = pd.read_csv('NF-ToN-IoT-v2.csv')
+    elif dataset == 'NF-CSE-CIC-IDS2018-v2':
+        data = pd.read_csv('NF-CSE-CIC-IDS2018-v2.csv')
     else:
         raise ValueError("Invalid dataset name.")
     return data
@@ -197,15 +200,16 @@ def resample_nf_bot_iot(data):
     np.save(get_test_labels_file_path(dataset), actual)
     print("Test graph created and saved to file.")
 
+
 # 下采样NF-BoT-IoT数据集
 def resample_data(dataset):
-    data = frac_data(dataset, 0.1)
+    data = frac_data(dataset, 0.02)
     resample_nf_bot_iot(data)
     print("Train graph or test graph file not found. Creating new graph.")
 
 
 if __name__ == '__main__':
-    dataset = 'NF-ToN-IoT-v2'
+    dataset = 'NF-CSE-CIC-IDS2018-v2'
     resample_data(dataset)
 
 
