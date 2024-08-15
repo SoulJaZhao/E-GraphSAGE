@@ -168,6 +168,9 @@ class MLPPredictor(nn.Module):
         self.mlp_name = mlp_name
         self.fusion_name = fusion_name
 
+        # Explicitly set fusion to None initially
+        self.fusion = None
+
         if fusion_name == "DFF":
             self.fusion = DFF(in_features)
         elif fusion_name == "MSAF":
@@ -203,7 +206,7 @@ class MLPPredictor(nn.Module):
         h_v = edges.dst['h']
 
         # 执行特征融合
-        if self.fusion != None:
+        if self.fusion is not None:
             if self.fusion_name == "GATE":
                 input1 = h_u.view(h_u.size(0), 1, 1, -1)
                 input2 = h_v.view(h_v.size(0), 1, 1, -1)
@@ -276,14 +279,14 @@ fusion 方法:
     - WCMF: WCMF
     - GATE: GatedFusion
 '''
-fusion_name = "GATE"
+fusion_name = None
 
 '''
 mlp 方法：
     - KAN: KAN
     - MLP: MLP
 '''
-mlp_name = "KAN"
+mlp_name = "MLP"
 
 if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
     output_classes = 5
@@ -294,8 +297,8 @@ else:
 
 epochs = 1000
 best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
-report_file_path = f'./reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
-test_pred_file_path = f'./predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
+report_file_path = f'./binary_reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
+test_pred_file_path = f'./binary_predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
 
 # 打印出所有实验配置
 print(f'Dataset: {dataset}')
@@ -449,16 +452,17 @@ test_pred = test_pred.argmax(1)
 # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
 test_pred = test_pred.cpu().detach().numpy()
 
-actual = le_label.inverse_transform(actual)
-test_pred = le_label.inverse_transform(test_pred)
+# 将实际标签和预测标签转换为 "Normal" 或 "Attack"
+actual = ["Normal" if i == 0 else "Attack" for i in actual]
+test_pred = ["Normal" if i == 0 else "Attack" for i in test_pred]
 
 # 打印详细的分类报告
-report = classification_report(actual, test_pred, target_names=np.unique(actual), output_dict=True)
+report = classification_report(actual, test_pred, target_names=["Normal", "Attack"], output_dict=True)
 # 保存分类报告为JSON文件
 with open(report_file_path, 'w') as jsonfile:
     json.dump(report, jsonfile, indent=4)
 
-print(report)
+print(classification_report(actual, test_pred, target_names=["Normal", "Attack"]))
 
 # 定义绘制混淆矩阵的函数
 def plot_confusion_matrix(cm,
@@ -502,7 +506,8 @@ def plot_confusion_matrix(cm,
 
     plt.tight_layout()
     plt.ylabel('True label')
-    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
+    plt.xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}\n'
+               f'Precision={report["weighted avg"]["precision"]:0.4f}; Recall={report["weighted avg"]["recall"]:0.4f}; F1-Score={report["weighted avg"]["f1-score"]:0.4f}')
     plt.show()
 
 # 绘制混淆矩阵
@@ -511,3 +516,4 @@ plot_confusion_matrix(cm=cm,
                       normalize=False,
                       target_names=np.unique(actual),
                       title="Confusion Matrix")
+
