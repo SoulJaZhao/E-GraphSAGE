@@ -48,26 +48,47 @@ from WCMF import WCMF
 from GatedFusion import gatedFusion
 
 import pickle
-from data_preprocess import get_train_graph_file_path, get_test_graph_file_path, get_label_encoder_file_path, get_test_labels_file_path
+from data_preprocess import get_train_graph_file_path, get_test_graph_file_path, get_label_encoder_file_path, \
+    get_test_labels_file_path
+
 warnings.filterwarnings("ignore")
+
 
 # 定义加载 DGL 图的方法
 def load_graph(file_path):
     return dgl.load_graphs(file_path)[0][0]
 
+
 # 定义计算准确度的函数
 def compute_accuracy(pred, labels):
     return (pred.argmax(1) == labels).float().mean().item()
 
+
 # 定义计算 F1 score 的函数
-def compute_f1_score(pred, labels):
-    pred_labels = pred.argmax(1).cpu().numpy()
-    # 如果 labels 已经是 numpy 数组，则直接使用它
-    if isinstance(labels, np.ndarray):
+# def compute_f1_score(pred, labels):
+#     pred_labels = pred.argmax(1).cpu().numpy()
+#     # 如果 labels 已经是 numpy 数组，则直接使用它
+#     if isinstance(labels, np.ndarray):
+#         true_labels = labels
+#     else:
+#         true_labels = labels.cpu().numpy()
+#     return f1_score(true_labels, pred_labels, average='weighted')
+
+def compute_f1_score(pred, labels, binary=False):
+    if binary:
+        # Directly use the string labels for binary classification
+        pred_labels = pred
         true_labels = labels
     else:
-        true_labels = labels.cpu().numpy()
+        # Handle multi-class classification
+        pred_labels = pred.argmax(1).cpu().numpy()
+        if isinstance(labels, np.ndarray):
+            true_labels = labels
+        else:
+            true_labels = labels.cpu().numpy()
+
     return f1_score(true_labels, pred_labels, average='weighted')
+
 
 class SEAttention(nn.Module):
     def __init__(self, in_channels, reduction=16):
@@ -82,6 +103,7 @@ class SEAttention(nn.Module):
         excitation = F.relu(self.fc1(squeeze))
         excitation = self.sigmoid(self.fc2(excitation)).view(b, c, 1, 1)
         return x * excitation
+
 
 class SAGELayer(nn.Module):
     def __init__(self, ndim_in, edims, ndim_out, activation, attention_name):
@@ -133,6 +155,7 @@ class SAGELayer(nn.Module):
             # 返回更新后的节点特征
             return g.ndata['h']
 
+
 # 定义一个SAGE类，继承自nn.Module
 class SAGE(nn.Module):
     def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name):
@@ -158,6 +181,7 @@ class SAGE(nn.Module):
             nfeats = layer(g, nfeats, efeats)
         # 返回每个节点特征的和
         return nfeats.sum(1)
+
 
 # 定义一个MLPPredictor类，继承自nn.Module
 class MLPPredictor(nn.Module):
@@ -241,9 +265,11 @@ class MLPPredictor(nn.Module):
             # 返回边数据中的预测得分
             return graph.edata['score']
 
+
 # 定义一个Model类，继承自nn.Module
 class Model(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name, mlp_name, output_classes):
+    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name, fusion_name, mlp_name,
+                 output_classes):
         super().__init__()
         # 初始化Model类
         # 创建一个SAGE模型，用于图神经网络层
@@ -257,6 +283,7 @@ class Model(nn.Module):
         h = self.gnn(g, nfeats, efeats)
         # 使用MLPPredictor模型进行边的预测，并返回预测结果
         return self.pred(g, h)
+
 
 # 定义实验参数
 dataset = 'NF-BoT-IoT'
@@ -279,14 +306,14 @@ fusion 方法:
     - WCMF: WCMF
     - GATE: GatedFusion
 '''
-fusion_name = None
+fusion_name = "GATE"
 
 '''
 mlp 方法：
     - KAN: KAN
     - MLP: MLP
 '''
-mlp_name = "MLP"
+mlp_name = "KAN"
 
 if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
     output_classes = 5
@@ -295,10 +322,14 @@ elif dataset == "NF-CSE-CIC-IDS2018-v2":
 else:
     output_classes = 10
 
-epochs = 1000
-best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
-report_file_path = f'./binary_reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
-test_pred_file_path = f'./binary_predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
+epochs = 3000
+binary_best_model_file_path = f'./binary_model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
+binary_report_file_path = f'./binary_reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
+binary_test_pred_file_path = f'./binary_predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
+
+multiclass_best_model_file_path = f'./model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
+multiclass_report_file_path = f'./reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
+multiclass_test_pred_file_path = f'./predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
 
 # 打印出所有实验配置
 print(f'Dataset: {dataset}')
@@ -306,8 +337,8 @@ print(f'Attention: {attention_name}')
 print(f'Fusion: {fusion_name}')
 print(f'MLP: {mlp_name}')
 print(f'Epochs: {epochs}')
-print(f'Best model file path: {best_model_file_path}')
-print(f'Report file path: {report_file_path}')
+print(f'Best model file path: {multiclass_best_model_file_path}')
+print(f'Report file path: {multiclass_report_file_path}')
 
 # 获取图
 G = load_graph(get_train_graph_file_path(dataset))
@@ -318,7 +349,6 @@ actual = np.load(get_test_labels_file_path(dataset))
 # 获取标签编码器
 with open(get_label_encoder_file_path(dataset), 'rb') as f:
     le_label = pickle.load(f)
-
 
 # 将节点特征重塑为三维张量
 # 原始节点特征维度为 (num_nodes, feature_dim)
@@ -333,7 +363,8 @@ G.edata['h'] = th.reshape(G.edata['h'], (G.edata['h'].shape[0], 1, G.edata['h'].
 # 重塑测试图的节点特征为三维张量
 # 原始节点特征维度为 (num_nodes, feature_dim)
 # 重塑后的维度为 (num_nodes, 1, feature_dim)
-G_test.ndata['feature'] = th.reshape(G_test.ndata['feature'], (G_test.ndata['feature'].shape[0], 1, G_test.ndata['feature'].shape[1]))
+G_test.ndata['feature'] = th.reshape(G_test.ndata['feature'],
+                                     (G_test.ndata['feature'].shape[0], 1, G_test.ndata['feature'].shape[1]))
 
 # 重塑测试图的边特征为三维张量
 # 原始边特征维度为 (num_edges, feature_dim)
@@ -371,7 +402,9 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=128, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2, attention_name=attention_name, fusion_name=fusion_name, mlp_name=mlp_name, output_classes=output_classes).to(device)
+model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=128, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2,
+              attention_name=attention_name, fusion_name=fusion_name, mlp_name=mlp_name,
+              output_classes=output_classes).to(device)
 
 # 将节点特征和边特征移动到设备上
 node_features = node_features.to(device)
@@ -384,6 +417,7 @@ opt = Adam(model.parameters())
 
 # 变量用于保存最高的 F1 score
 best_f1_score = 0.0
+binary_best_f1_score = 0.0
 
 # 将测试图移动到设备（GPU 或 CPU）
 G_test = G_test.to(device)
@@ -398,7 +432,6 @@ node_features_test = G_test.ndata['feature']
 edge_features_test = G_test.edata['h']
 
 # 训练循环
-'''
 for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     # 前向传播，获取预测值
     pred = model(G, node_features, edge_features)
@@ -426,21 +459,43 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
     with th.no_grad():  # 禁用梯度计算
         test_pred = model(G_test, node_features_test, edge_features_test)
         current_f1_score = compute_f1_score(test_pred, actual)
+
+        # 获取预测标签
+        binary_test_pred = test_pred.argmax(1)
+
+        # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
+        binary_test_pred_numpy = binary_test_pred.cpu().detach().numpy()
+
+        # Create binary labels for prediction and actual labels
+        binary_actual = ["Normal" if i == 0 else "Attack" for i in actual]
+        binary_test_pred = ["Normal" if i == 0 else "Attack" for i in binary_test_pred_numpy]
+
+        # Compute binary F1 score
+        # 打印详细的分类报告
+        binary_report = classification_report(binary_actual, binary_test_pred, target_names=["Normal", "Attack"],
+                                              output_dict=True)
+        current_binary_f1_score = binary_report["weighted avg"]["f1-score"]
+
         if current_f1_score > best_f1_score:
             best_f1_score = current_f1_score
-            th.save(model, best_model_file_path)
+            th.save(model, multiclass_best_model_file_path)
             print(f'New best model and graph saved at epoch {epoch} with F1 score: {best_f1_score}')
-'''
+
+        if current_binary_f1_score > binary_best_f1_score:
+            binary_best_f1_score = current_binary_f1_score
+            th.save(model, binary_best_model_file_path)
+            print(f'New best binary model and graph saved at epoch {epoch} with F1 score: {binary_best_f1_score}')
 
 # 进行前向传播，获取测试预测
 # 将模型移动到设备上（GPU 或 CPU）
-best_model = th.load(best_model_file_path,  map_location=th.device('cpu'))
+best_model = th.load(multiclass_best_model_file_path, map_location=th.device('cpu'))
 best_model = best_model.to(device)
 best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
 
 # 保存test_pred到本地
-th.save(test_pred, test_pred_file_path)
+th.save(test_pred, multiclass_test_pred_file_path)
+th.save(test_pred, binary_test_pred_file_path)
 
 # 计算并打印前向传播所花费的时间
 elapsed = timeit.default_timer() - start_time
@@ -452,17 +507,18 @@ test_pred = test_pred.argmax(1)
 # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
 test_pred = test_pred.cpu().detach().numpy()
 
-# 将实际标签和预测标签转换为 "Normal" 或 "Attack"
-actual = ["Normal" if i == 0 else "Attack" for i in actual]
-test_pred = ["Normal" if i == 0 else "Attack" for i in test_pred]
+multi_actual = le_label.inverse_transform(actual)
+multi_test_pred = le_label.inverse_transform(test_pred)
 
 # 打印详细的分类报告
-report = classification_report(actual, test_pred, target_names=["Normal", "Attack"], output_dict=True)
+multi_report = classification_report(multi_actual, multi_test_pred, target_names=np.unique(multi_test_pred),
+                                     output_dict=True)
 # 保存分类报告为JSON文件
-with open(report_file_path, 'w') as jsonfile:
-    json.dump(report, jsonfile, indent=4)
+with open(multiclass_report_file_path, 'w') as jsonfile:
+    json.dump(multi_report, jsonfile, indent=4)
 
-print(classification_report(actual, test_pred, target_names=["Normal", "Attack"]))
+print(multi_report)
+
 
 # 定义绘制混淆矩阵的函数
 def plot_confusion_matrix(cm,
@@ -506,14 +562,81 @@ def plot_confusion_matrix(cm,
 
     plt.tight_layout()
     plt.ylabel('True label')
+    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
+    plt.show()
+
+
+# 绘制混淆矩阵
+# cm = confusion_matrix(multi_actual, multi_test_pred)
+# plot_confusion_matrix(cm=cm,
+#                       normalize=False,
+#                       target_names=np.unique(multi_actual),
+#                       title="Confusion Matrix")
+
+# 将实际标签和预测标签转换为 "Normal" 或 "Attack"
+binary_actual = ["Normal" if i == 0 else "Attack" for i in actual]
+binary_test_pred = ["Normal" if i == 0 else "Attack" for i in test_pred]
+
+# 打印详细的分类报告
+binary_report = classification_report(binary_actual, binary_test_pred, target_names=["Normal", "Attack"],
+                                      output_dict=True)
+# 保存分类报告为JSON文件
+with open(binary_report_file_path, 'w') as jsonfile:
+    json.dump(binary_report, jsonfile, indent=4)
+
+print(classification_report(binary_actual, binary_test_pred, target_names=["Normal", "Attack"]))
+
+
+# 定义绘制混淆矩阵的函数
+def binary_plot_confusion_matrix(cm,
+                                 target_names,
+                                 title='Confusion matrix',
+                                 cmap=None,
+                                 normalize=True):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import itertools
+
+    accuracy = np.trace(cm) / float(np.sum(cm))
+    misclass = 1 - accuracy
+
+    if cmap is None:
+        cmap = plt.get_cmap('Blues')
+
+    plt.figure(figsize=(12, 12))
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+
+    if target_names is not None:
+        tick_marks = np.arange(len(target_names))
+        plt.xticks(tick_marks, target_names, rotation=45)
+        plt.yticks(tick_marks, target_names)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    thresh = cm.max() / 1.5 if normalize else cm.max() / 2
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        if normalize:
+            plt.text(j, i, "{:0.4f}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+        else:
+            plt.text(j, i, "{:,}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
     plt.xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}\n'
-               f'Precision={report["weighted avg"]["precision"]:0.4f}; Recall={report["weighted avg"]["recall"]:0.4f}; F1-Score={report["weighted avg"]["f1-score"]:0.4f}')
+               f'Precision={binary_report["weighted avg"]["precision"]:0.4f}; Recall={binary_report["weighted avg"]["recall"]:0.4f}; F1-Score={binary_report["weighted avg"]["f1-score"]:0.4f}')
     plt.show()
 
 # 绘制混淆矩阵
-cm = confusion_matrix(actual, test_pred)
-plot_confusion_matrix(cm=cm,
-                      normalize=False,
-                      target_names=np.unique(actual),
-                      title="Confusion Matrix")
+# binary_cm = confusion_matrix(binary_actual, binary_test_pred)
+# binary_plot_confusion_matrix(cm=binary_cm,
+#                       normalize=False,
+#                       target_names=np.unique(binary_actual),
+#                       title="Confusion Matrix")
 
