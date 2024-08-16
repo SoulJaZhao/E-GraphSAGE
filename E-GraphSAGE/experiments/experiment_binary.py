@@ -518,7 +518,7 @@ multi_actual = le_label.inverse_transform(actual)
 multi_test_pred = le_label.inverse_transform(test_pred)
 
 # 打印详细的分类报告
-multi_report = classification_report(multi_actual, multi_test_pred, target_names=np.unique(multi_test_pred),
+multi_report = classification_report(multi_actual, multi_test_pred, target_names=np.unique(multi_actual),
                                      output_dict=True)
 # 保存分类报告为JSON文件
 with open(multiclass_report_file_path, 'w') as jsonfile:
