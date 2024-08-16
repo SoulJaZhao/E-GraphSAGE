@@ -488,10 +488,15 @@ for epoch in tqdm(range(1, epochs + 1), desc="Training Epochs"):
 
 # 进行前向传播，获取测试预测
 # 将模型移动到设备上（GPU 或 CPU）
-best_model = th.load(multiclass_best_model_file_path, map_location=th.device('cpu'))
+best_model = th.load(multiclass_best_model_file_path)
 best_model = best_model.to(device)
 best_model.eval()
 test_pred = best_model(G_test, node_features_test, edge_features_test).to(device)
+
+binary_best_model = th.load(binary_best_model_file_path)
+binary_best_model = binary_best_model.to(device)
+binary_best_model.eval()
+binary_test_pred = binary_best_model(G_test, node_features_test, edge_features_test).to(device)
 
 # 保存test_pred到本地
 th.save(test_pred, multiclass_test_pred_file_path)
@@ -503,9 +508,11 @@ print(str(elapsed) + ' seconds')
 
 # 获取预测标签
 test_pred = test_pred.argmax(1)
+binary_test_pred = binary_test_pred.argmax(1)
 
 # 将预测结果从 GPU 移动到 CPU，并转换为 numpy 数组
 test_pred = test_pred.cpu().detach().numpy()
+binary_test_pred = binary_test_pred.cpu().detach().numpy()
 
 multi_actual = le_label.inverse_transform(actual)
 multi_test_pred = le_label.inverse_transform(test_pred)
@@ -575,7 +582,7 @@ def plot_confusion_matrix(cm,
 
 # 将实际标签和预测标签转换为 "Normal" 或 "Attack"
 binary_actual = ["Normal" if i == 0 else "Attack" for i in actual]
-binary_test_pred = ["Normal" if i == 0 else "Attack" for i in test_pred]
+binary_test_pred = ["Normal" if i == 0 else "Attack" for i in binary_test_pred]
 
 # 打印详细的分类报告
 binary_report = classification_report(binary_actual, binary_test_pred, target_names=["Normal", "Attack"],
