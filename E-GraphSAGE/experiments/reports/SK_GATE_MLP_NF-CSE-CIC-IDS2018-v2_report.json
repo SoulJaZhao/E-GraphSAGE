@@ -1,0 +1,105 @@
+{
+    "Benign": {
+        "precision": 0.880481285781075,
+        "recall": 1.0,
+        "f1-score": 0.9364424867598287,
+        "support": 199628.0
+    },
+    "Bot": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1718.0
+    },
+    "Brute Force -Web": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 26.0
+    },
+    "Brute Force -XSS": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12.0
+    },
+    "DDOS attack-HOIC": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 12970.0
+    },
+    "DDOS attack-LOIC-UDP": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 24.0
+    },
+    "DDoS attacks-LOIC-HTTP": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3688.0
+    },
+    "DoS attacks-GoldenEye": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 332.0
+    },
+    "DoS attacks-Hulk": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5192.0
+    },
+    "DoS attacks-SlowHTTPTest": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 168.0
+    },
+    "DoS attacks-Slowloris": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 114.0
+    },
+    "FTP-BruteForce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 312.0
+    },
+    "Infilteration": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1396.0
+    },
+    "SQL Injection": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 6.0
+    },
+    "SSH-Bruteforce": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1140.0
+    },
+    "accuracy": 0.880481285781075,
+    "macro avg": {
+        "precision": 0.058698752385405,
+        "recall": 0.06666666666666667,
+        "f1-score": 0.06242949911732191,
+        "support": 226726.0
+    },
+    "weighted avg": {
+        "precision": 0.7752472946106951,
+        "recall": 0.880481285781075,
+        "f1-score": 0.8245200848023211,
+        "support": 226726.0
+    }
+}
