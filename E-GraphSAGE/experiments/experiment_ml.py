@@ -30,8 +30,8 @@ import ipaddress
 
 warnings.filterwarnings("ignore")
 
-dataset = 'NF-ToN-IoT'
-classes_count= 10
+dataset = 'NF-BoT-IoT'
+classes_count= 5
 multiclass_report_file_path = f'./reports/SVM_{dataset}_report.json'
 binary_report_file_path = f'./binary_reports/SVM_{dataset}_report.json'
 data = pd.read_csv(f'{dataset}.csv')
@@ -123,14 +123,14 @@ svm_model.fit(X_train, y_train)
 y_pred = svm_model.predict(X_test)
 
 
-# 创建 RandomForestClassifier 实例
-rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-
-# 训练模型
-rf_model.fit(X_train, y_train)
-
-# 进行预测
-y_pred = rf_model.predict(X_test)
+# # 创建 RandomForestClassifier 实例
+# rf_model = RandomForestClassifier(n_estimators=20, random_state=42)
+#
+# # 训练模型
+# rf_model.fit(X_train, y_train)
+#
+# # 进行预测
+# y_pred = rf_model.predict(X_test)
 
 
 multi_actual = le_label.inverse_transform(y_test)
