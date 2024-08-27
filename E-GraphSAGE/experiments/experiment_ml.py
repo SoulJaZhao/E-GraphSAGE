@@ -25,13 +25,13 @@ from imblearn.under_sampling import RandomUnderSampler, NearMiss, InstanceHardne
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 import ipaddress
 
 warnings.filterwarnings("ignore")
 
-dataset = 'NF-BoT-IoT'
-classes_count= 5
+dataset = 'NF-ToN-IoT'
+classes_count= 10
 multiclass_report_file_path = f'./reports/SVM_{dataset}_report.json'
 binary_report_file_path = f'./binary_reports/SVM_{dataset}_report.json'
 data = pd.read_csv(f'{dataset}.csv')
@@ -114,7 +114,7 @@ class_weights = class_weight.compute_class_weight('balanced',
 # y_pred = etc.predict(X_test)
 
 # 创建 SVM 分类器
-svm_model = SVC(kernel='linear', C=1.0, random_state=2024)
+svm_model = LinearSVC(C=1.0, random_state=2024)
 
 # 训练模型
 svm_model.fit(X_train, y_train)

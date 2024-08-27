@@ -1,0 +1,75 @@
+{
+    "Benign": {
+        "precision": 0.12316119206673358,
+        "recall": 0.1755340141088254,
+        "f1-score": 0.144756112444571,
+        "support": 81084
+    },
+    "backdoor": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5174
+    },
+    "ddos": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 97904
+    },
+    "dos": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5315
+    },
+    "injection": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 140562
+    },
+    "mitm": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 388
+    },
+    "password": {
+        "precision": 0.10942629409930286,
+        "recall": 0.6959479633184048,
+        "f1-score": 0.18911706156605596,
+        "support": 46890
+    },
+    "ransomware": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 43
+    },
+    "scanning": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 6440
+    },
+    "xss": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 29983
+    },
+    "accuracy": 0.1132622654869823,
+    "macro avg": {
+        "precision": 0.023258748616603646,
+        "recall": 0.08714819774272302,
+        "f1-score": 0.0333873174010627,
+        "support": 413783
+    },
+    "weighted avg": {
+        "precision": 0.03653461120407396,
+        "recall": 0.1132622654869823,
+        "f1-score": 0.049796882999755814,
+        "support": 413783
+    }
+}
