@@ -30,12 +30,12 @@ import ipaddress
 
 warnings.filterwarnings("ignore")
 
-dataset = 'NF-ToN-IoT'
-classes_count= 10
-multiclass_report_file_path = f'./reports/SVM_{dataset}_report.json'
-binary_report_file_path = f'./binary_reports/SVM_{dataset}_report.json'
-data_original = pd.read_csv(f'{dataset}.csv')
-data = data_original.groupby(by='Attack').sample(frac=0.1, random_state=2024)
+dataset = 'NF-BoT-IoT-v2'
+classes_count= 5
+multiclass_report_file_path = f'./reports/KNN_{dataset}_report.json'
+binary_report_file_path = f'./binary_reports/KNN_{dataset}_report.json'
+data_origin = pd.read_csv(f'{dataset}.csv')
+data = data_origin.groupby(by='Attack').sample(frac=0.1, random_state=2024)
 
 def ip_to_int(ip):
     return int(ipaddress.IPv4Address(ip))
@@ -96,14 +96,14 @@ class_weights = class_weight.compute_class_weight('balanced',
                                                   classes=unique_labels,
                                                   y=y_test)
 
-# # 创建 KNN 分类器实例
-# knn = KNeighborsClassifier(n_neighbors=classes_count)  # 这里选择了 k=3
-#
-# # 训练模型
-# knn.fit(X_train, y_train)
-#
-# # 进行预测
-# y_pred = knn.predict(X_test)
+# 创建 KNN 分类器实例
+knn = KNeighborsClassifier(n_neighbors=classes_count)  # 这里选择了 k=3
+
+# 训练模型
+knn.fit(X_train, y_train)
+
+# 进行预测
+y_pred = knn.predict(X_test)
 
 # # 创建 ExtraTreesClassifier 实例
 # etc = ExtraTreesClassifier(n_estimators=100, random_state=42)
@@ -114,14 +114,14 @@ class_weights = class_weight.compute_class_weight('balanced',
 # # 进行预测
 # y_pred = etc.predict(X_test)
 
-# 创建 SVM 分类器
-svm_model = SVC(C=1.0, kernel='linear', random_state=2024)
-
-# 训练模型
-svm_model.fit(X_train, y_train)
-
-# 进行预测
-y_pred = svm_model.predict(X_test)
+# # 创建 SVM 分类器
+# svm_model = SVC(kernel='rbf', C=1.0, random_state=2024)
+#
+# # 训练模型
+# svm_model.fit(X_train, y_train)
+#
+# # 进行预测
+# y_pred = svm_model.predict(X_test)
 
 
 # # 创建 RandomForestClassifier 实例

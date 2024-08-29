@@ -341,7 +341,7 @@ elif dataset == "NF-CSE-CIC-IDS2018-v2":
 else:
     output_classes = 10
 
-epochs = 1000
+epochs = 3000
 binary_best_model_file_path = f'./binary_model/GAT_{dataset}_best_model.pth'
 binary_report_file_path = f'./binary_reports/GAT_{dataset}_report.json'
 binary_test_pred_file_path = f'./binary_predictions/GAT_{dataset}_test_pred.pth'
@@ -421,7 +421,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=128, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2,
+model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=39, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2,
               attention_name=attention_name, fusion_name=fusion_name, mlp_name=mlp_name,
               output_classes=output_classes).to(device)
 
