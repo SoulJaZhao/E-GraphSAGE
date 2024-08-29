@@ -30,12 +30,12 @@ import ipaddress
 
 warnings.filterwarnings("ignore")
 
-dataset = 'NF-ToN-IoT'
-classes_count= 10
+dataset = 'NF-BoT-IoT-v2'
+classes_count= 5
 
-binary_report_file_path = f'./binary_reports/ETC_{dataset}_report.json'
+binary_report_file_path = f'./binary_reports/KNN_{dataset}_report.json'
 data = pd.read_csv(f'{dataset}.csv')
-# data = data.groupby(by='Attack').sample(frac=0.1, random_state=2024)
+data = data.groupby(by='Attack').sample(frac=0.3, random_state=2024)
 
 def ip_to_int(ip):
     return int(ipaddress.IPv4Address(ip))
