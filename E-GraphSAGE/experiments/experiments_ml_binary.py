@@ -32,10 +32,10 @@ warnings.filterwarnings("ignore")
 
 dataset = 'NF-ToN-IoT'
 classes_count= 10
-multiclass_report_file_path = f'./reports/SVM_{dataset}_report.json'
-binary_report_file_path = f'./binary_reports/SVM_{dataset}_report.json'
-data_original = pd.read_csv(f'{dataset}.csv')
-data = data_original.groupby(by='Attack').sample(frac=0.1, random_state=2024)
+
+binary_report_file_path = f'./binary_reports/ETC_{dataset}_report.json'
+data = pd.read_csv(f'{dataset}.csv')
+# data = data.groupby(by='Attack').sample(frac=0.1, random_state=2024)
 
 def ip_to_int(ip):
     return int(ipaddress.IPv4Address(ip))
@@ -46,14 +46,10 @@ data['IPV4_SRC_ADDR'] = np.vectorize(ip_to_int)(data['IPV4_SRC_ADDR'])
 
 data['IPV4_DST_ADDR'] = np.vectorize(ip_to_int)(data['IPV4_DST_ADDR'])
 
-# 删除不再需要的 Label 列
-data.drop(columns=['Label'], inplace=True)
-
 # 将 Label 列重命名为 label
-data.rename(columns={"Attack": "label"}, inplace=True)
+data.rename(columns={"Label": "label"}, inplace=True)
 
-le_label = LabelEncoder()
-data['label'] = le_label.fit_transform(data['label'])
+data = data.drop(columns='Attack')
 
 # 将 label 列提取出来，保存到一个单独的变量中
 label = data['label']
@@ -88,16 +84,8 @@ X_test = encoder.transform(X_test)
 # 对需要标准化的列进行标准化
 X_test[cols_to_norm] = scaler.transform(X_test[cols_to_norm])
 
-# 获取边标签的唯一值
-unique_labels = np.unique(y_test)
-
-# 计算每个类的权重，以处理类别不平衡问题
-class_weights = class_weight.compute_class_weight('balanced',
-                                                  classes=unique_labels,
-                                                  y=y_test)
-
 # # 创建 KNN 分类器实例
-# knn = KNeighborsClassifier(n_neighbors=classes_count)  # 这里选择了 k=3
+# knn = KNeighborsClassifier(n_neighbors=5)  # 这里选择了 k=3
 #
 # # 训练模型
 # knn.fit(X_train, y_train)
@@ -105,23 +93,23 @@ class_weights = class_weight.compute_class_weight('balanced',
 # # 进行预测
 # y_pred = knn.predict(X_test)
 
-# # 创建 ExtraTreesClassifier 实例
-# etc = ExtraTreesClassifier(n_estimators=100, random_state=42)
-#
-# # 训练模型
-# etc.fit(X_train, y_train)
-#
-# # 进行预测
-# y_pred = etc.predict(X_test)
-
-# 创建 SVM 分类器
-svm_model = SVC(C=1.0, kernel='linear', random_state=2024)
+# 创建 ExtraTreesClassifier 实例
+etc = ExtraTreesClassifier(n_estimators=100, random_state=42)
 
 # 训练模型
-svm_model.fit(X_train, y_train)
+etc.fit(X_train, y_train)
 
 # 进行预测
-y_pred = svm_model.predict(X_test)
+y_pred = etc.predict(X_test)
+
+# # 创建 SVM 分类器
+# svm_model = SVC(C=1.0, kernel='linear', random_state=2024)
+#
+# # 训练模型
+# svm_model.fit(X_train, y_train)
+#
+# # 进行预测
+# y_pred = svm_model.predict(X_test)
 
 
 # # 创建 RandomForestClassifier 实例
@@ -132,19 +120,6 @@ y_pred = svm_model.predict(X_test)
 #
 # # 进行预测
 # y_pred = rf_model.predict(X_test)
-
-
-multi_actual = le_label.inverse_transform(y_test)
-multi_test_pred = le_label.inverse_transform(y_pred)
-
-# 打印详细的分类报告
-multi_report = classification_report(multi_actual, multi_test_pred, target_names=np.unique(multi_actual),
-                                     output_dict=True)
-# 保存分类报告为JSON文件
-with open(multiclass_report_file_path, 'w') as jsonfile:
-    json.dump(multi_report, jsonfile, indent=4)
-
-print(multi_report)
 
 # 将实际标签和预测标签转换为 "Normal" 或 "Attack"
 binary_actual = ["Normal" if i == 0 else "Attack" for i in y_test]
