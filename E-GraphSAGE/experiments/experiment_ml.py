@@ -32,8 +32,8 @@ warnings.filterwarnings("ignore")
 
 dataset = 'NF-BoT-IoT-v2'
 classes_count= 5
-multiclass_report_file_path = f'./reports/RF_{dataset}_report.json'
-binary_report_file_path = f'./binary_reports/RF_{dataset}_report.json'
+multiclass_report_file_path = f'./reports/KNN_{dataset}_report.json'
+binary_report_file_path = f'./binary_reports/KNN_{dataset}_report.json'
 data = pd.read_csv(f'{dataset}.csv')
 data = data.groupby(by='Attack').sample(frac=0.3, random_state=2024)
 
@@ -96,14 +96,14 @@ class_weights = class_weight.compute_class_weight('balanced',
                                                   classes=unique_labels,
                                                   y=y_test)
 
-# # 创建 KNN 分类器实例
-# knn = KNeighborsClassifier(n_neighbors=classes_count)  # 这里选择了 k=3
-#
-# # 训练模型
-# knn.fit(X_train, y_train)
-#
-# # 进行预测
-# y_pred = knn.predict(X_test)
+# 创建 KNN 分类器实例
+knn = KNeighborsClassifier(n_neighbors=classes_count)  # 这里选择了 k=3
+
+# 训练模型
+knn.fit(X_train, y_train)
+
+# 进行预测
+y_pred = knn.predict(X_test)
 
 # # 创建 ExtraTreesClassifier 实例
 # etc = ExtraTreesClassifier(n_estimators=100, random_state=42)
@@ -124,14 +124,14 @@ class_weights = class_weight.compute_class_weight('balanced',
 # y_pred = svm_model.predict(X_test)
 
 
-# 创建 RandomForestClassifier 实例
-rf_model = RandomForestClassifier(n_estimators=20, random_state=42)
-
-# 训练模型
-rf_model.fit(X_train, y_train)
-
-# 进行预测
-y_pred = rf_model.predict(X_test)
+# # 创建 RandomForestClassifier 实例
+# rf_model = RandomForestClassifier(n_estimators=20, random_state=42)
+#
+# # 训练模型
+# rf_model.fit(X_train, y_train)
+#
+# # 进行预测
+# y_pred = rf_model.predict(X_test)
 
 
 multi_actual = le_label.inverse_transform(y_test)
