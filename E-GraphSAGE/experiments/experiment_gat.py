@@ -64,17 +64,6 @@ def load_graph(file_path):
 def compute_accuracy(pred, labels):
     return (pred.argmax(1) == labels).float().mean().item()
 
-
-# 定义计算 F1 score 的函数
-# def compute_f1_score(pred, labels):
-#     pred_labels = pred.argmax(1).cpu().numpy()
-#     # 如果 labels 已经是 numpy 数组，则直接使用它
-#     if isinstance(labels, np.ndarray):
-#         true_labels = labels
-#     else:
-#         true_labels = labels.cpu().numpy()
-#     return f1_score(true_labels, pred_labels, average='weighted')
-
 def compute_f1_score(pred, labels, binary=False):
     if binary:
         # Directly use the string labels for binary classification
@@ -91,103 +80,11 @@ def compute_f1_score(pred, labels, binary=False):
     return f1_score(true_labels, pred_labels, average='weighted')
 
 
-class SEAttention(nn.Module):
-    def __init__(self, in_channels, reduction=16):
-        super(SEAttention, self).__init__()
-        self.fc1 = nn.Linear(in_channels, in_channels // reduction)
-        self.fc2 = nn.Linear(in_channels // reduction, in_channels)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        b, c, h, w = x.size()
-        squeeze = F.adaptive_avg_pool2d(x, (1, 1)).view(b, c)
-        excitation = F.relu(self.fc1(squeeze))
-        excitation = self.sigmoid(self.fc2(excitation)).view(b, c, 1, 1)
-        return x * excitation
-
-
-class SAGELayer(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation, attention_name):
-        super(SAGELayer, self).__init__()
-        # 初始化SAGELayer类
-        # 定义消息传递的线性层，输入维度为节点特征和边特征之和，输出维度为指定的ndim_out
-        self.W_msg = nn.Linear(ndim_in + edims, ndim_out)
-        # 定义应用权重的线性层，输入维度为节点特征和消息传递输出之和，输出维度为指定的ndim_out
-        self.W_apply = nn.Linear(ndim_in + ndim_out, ndim_out)
-        # 保存激活函数
-        self.activation = activation
-
-        if attention_name == "SE":
-            self.attention = SEAttention(ndim_out)
-        elif attention_name == "SK":
-            self.attention = SKAttention(channel=ndim_out, reduction=8)
-        elif attention_name == "CPCA":
-            self.attention = CPCABlock(in_channels=ndim_out, out_channels=ndim_out, channelAttention_reduce=4)
-        elif attention_name == "SCSA":
-            self.attention = SCSA(dim=ndim_out)
-        elif attention_name == "CBAM":
-            self.attention = CBAM(ndim_out)
-        else:
-            self.attention = None
-
-    # 定义消息传递函数，edges是DGL中的边数据
-    def message_func(self, edges):
-        # 将源节点特征和边特征连接起来，并通过线性层转换
-        return {'m': self.W_msg(th.cat([edges.src['h'], edges.data['h']], 2))}
-
-    # 定义前向传播函数
-    def forward(self, g_dgl, nfeats, efeats):
-        with g_dgl.local_scope():
-            g = g_dgl
-            # 设置节点特征和边特征
-            g.ndata['h'] = nfeats
-            g.edata['h'] = efeats
-            # 执行消息传递和聚合操作，更新节点特征
-            g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
-
-            # 先进行消息聚合，然后执行注意力机制
-            if self.attention == None:
-                aggregated_feats = g.ndata['h_neigh']
-            else:
-                aggregated_feats = g.ndata['h_neigh'].view(g.ndata['h_neigh'].size(0), -1, 1, 1)
-                aggregated_feats = self.attention(aggregated_feats).view(g.ndata['h_neigh'].size(0), 1, -1)
-            # 将融合后的特征与原始特征连接，并通过线性层进行转换和激活
-            g.ndata['h'] = F.relu(self.W_apply(th.cat([g.ndata['h'], aggregated_feats], 2)))
-            # 返回更新后的节点特征
-            return g.ndata['h']
-
-
-# 定义一个SAGE类，继承自nn.Module
-class SAGE(nn.Module):
-    def __init__(self, ndim_in, ndim_out, edim, activation, dropout, attention_name):
-        super(SAGE, self).__init__()
-        # 初始化SAGE类
-        # 创建一个ModuleList来存储SAGELayer层
-        self.layers = nn.ModuleList()
-        # 添加第一层SAGELayer，输入维度为ndim_in，输出维度为128
-        self.layers.append(SAGELayer(ndim_in, edim, 128, activation, attention_name))
-        # 添加第二层SAGELayer，输入维度为128，输出维度为ndim_out
-        self.layers.append(SAGELayer(128, edim, ndim_out, activation, attention_name))
-        # 定义dropout层，使用指定的dropout率
-        self.dropout = nn.Dropout(p=dropout)
-
-    # 定义前向传播函数
-    def forward(self, g, nfeats, efeats):
-        # 遍历每一层SAGELayer
-        for i, layer in enumerate(self.layers):
-            # 除第一层外，在输入到下一层前应用dropout
-            if i != 0:
-                nfeats = self.dropout(nfeats)
-            # 执行SAGELayer的前向传播
-            nfeats = layer(g, nfeats, efeats)
-        # 返回每个节点特征的和
-        return nfeats.sum(1)
-
 class TwoLayerGAT(nn.Module):
     def __init__(self, in_feats, hidden_feats, out_feats, dropout):
         super(TwoLayerGAT, self).__init__()
-        self.gat1 = GATConv(in_feats, hidden_feats, num_heads=4, feat_drop=dropout)
-        self.gat2 = GATConv(hidden_feats * 4, out_feats, num_heads=1, feat_drop=dropout)
+        self.gat1 = GATConv(in_feats, hidden_feats, num_heads=1, feat_drop=dropout)
+        self.gat2 = GATConv(hidden_feats, out_feats, num_heads=1, feat_drop=dropout)
         self.dropout = dropout
 
     def forward(self, g, nfeats):
@@ -195,7 +92,6 @@ class TwoLayerGAT(nn.Module):
         h = self.gat1(g, nfeats)
         h = h.flatten(1)  # Flatten the output of multi-head attention
         h = th.relu(h)
-        h = nn.functional.dropout(h, p=self.dropout, training=self.training)
 
         # Apply second GAT layer
         h = self.gat2(g, h)
@@ -421,7 +317,7 @@ edge_label = G.edata['label']
 train_mask = G.edata['train_mask']
 
 # 将模型移动到设备上（GPU 或 CPU）
-model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=39, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2,
+model = Model(ndim_in=G.ndata['h'].shape[2], ndim_out=128, edim=G.ndata['h'].shape[2], activation=F.relu, dropout=0.2,
               attention_name=attention_name, fusion_name=fusion_name, mlp_name=mlp_name,
               output_classes=output_classes).to(device)
 
@@ -591,14 +487,6 @@ def plot_confusion_matrix(cm,
     plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
     plt.show()
 
-
-# 绘制混淆矩阵
-# cm = confusion_matrix(multi_actual, multi_test_pred)
-# plot_confusion_matrix(cm=cm,
-#                       normalize=False,
-#                       target_names=np.unique(multi_actual),
-#                       title="Confusion Matrix")
-
 # 将实际标签和预测标签转换为 "Normal" 或 "Attack"
 binary_actual = ["Normal" if i == 0 else "Attack" for i in actual]
 binary_test_pred = ["Normal" if i == 0 else "Attack" for i in binary_test_pred]
@@ -658,11 +546,4 @@ def binary_plot_confusion_matrix(cm,
     plt.xlabel(f'Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}\n'
                f'Precision={binary_report["weighted avg"]["precision"]:0.4f}; Recall={binary_report["weighted avg"]["recall"]:0.4f}; F1-Score={binary_report["weighted avg"]["f1-score"]:0.4f}')
     plt.show()
-
-# 绘制混淆矩阵
-# binary_cm = confusion_matrix(binary_actual, binary_test_pred)
-# binary_plot_confusion_matrix(cm=binary_cm,
-#                       normalize=False,
-#                       target_names=np.unique(binary_actual),
-#                       title="Confusion Matrix")
 
