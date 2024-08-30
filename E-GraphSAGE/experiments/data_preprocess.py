@@ -203,13 +203,13 @@ def resample_nf_bot_iot(data):
 
 # 下采样NF-BoT-IoT数据集
 def resample_data(dataset):
-    data = frac_data(dataset, 0.3)
+    data = frac_data(dataset, 0.005)
     resample_nf_bot_iot(data)
     print("Train graph or test graph file not found. Creating new graph.")
 
 
 if __name__ == '__main__':
-    dataset = 'NF-ToN-IoT'
+    dataset = 'NF-BoT-IoT-v2'
     resample_data(dataset)
 
 

@@ -286,7 +286,7 @@ class Model(nn.Module):
 
 
 # 定义实验参数
-dataset = 'NF-BoT-IoT'
+dataset = 'NF-BoT-IoT-v2'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation
@@ -313,7 +313,7 @@ mlp 方法：
     - KAN: KAN
     - MLP: MLP
 '''
-mlp_name = "KAN"
+mlp_name = "MLP"
 
 if dataset == 'NF-BoT-IoT' or dataset == 'NF-BoT-IoT-v2':
     output_classes = 5
@@ -322,7 +322,7 @@ elif dataset == "NF-CSE-CIC-IDS2018-v2":
 else:
     output_classes = 10
 
-epochs = 3000
+epochs = 1000
 binary_best_model_file_path = f'./binary_model/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_best_model.pth'
 binary_report_file_path = f'./binary_reports/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_report.json'
 binary_test_pred_file_path = f'./binary_predictions/{attention_name}_{fusion_name}_{mlp_name}_{dataset}_test_pred.pth'
