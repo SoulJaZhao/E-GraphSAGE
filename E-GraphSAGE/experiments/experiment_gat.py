@@ -83,14 +83,14 @@ def compute_f1_score(pred, labels, binary=False):
 class TwoLayerGAT(nn.Module):
     def __init__(self, in_feats, hidden_feats, out_feats, dropout):
         super(TwoLayerGAT, self).__init__()
-        self.gat1 = GATConv(in_feats, hidden_feats, num_heads=1, feat_drop=dropout)
+        self.gat1 = GATConv(in_feats, hidden_feats, num_heads=4, feat_drop=dropout)
         self.gat2 = GATConv(hidden_feats, out_feats, num_heads=1, feat_drop=dropout)
         self.dropout = dropout
 
-    def forward(self, g, nfeats):
+    def forward(self, g, nfeats, efeats):
         # Apply first GAT layer
         h = self.gat1(g, nfeats)
-        h = h.flatten(1)  # Flatten the output of multi-head attention
+        h = th.mean(h, 2)  # Flatten the output of multi-head attention
         h = th.relu(h)
 
         # Apply second GAT layer
@@ -195,13 +195,13 @@ class Model(nn.Module):
     # 定义前向传播函数
     def forward(self, g, nfeats, efeats):
         # 使用SAGE模型进行节点特征的计算
-        h = self.gnn(g, nfeats)
+        h = self.gnn(g, nfeats, efeats)
         # 使用MLPPredictor模型进行边的预测，并返回预测结果
         return self.pred(g, h)
 
 
 # 定义实验参数
-dataset = 'NF-ToN-IoT'
+dataset = 'NF-BoT-IoT'
 '''
 attention 方法：
     - SE: Squeeze-and-Excitation

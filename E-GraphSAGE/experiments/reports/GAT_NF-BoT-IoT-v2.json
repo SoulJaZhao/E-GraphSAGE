@@ -1,0 +1,45 @@
+{
+    "Benign": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 244.0
+    },
+    "DDoS": {
+        "precision": 0.5183557971554099,
+        "recall": 0.8438087156797381,
+        "f1-score": 0.6422031044583343,
+        "support": 32998.0
+    },
+    "DoS": {
+        "precision": 0.6377279102384291,
+        "recall": 0.30301212848194053,
+        "f1-score": 0.4108239971087821,
+        "support": 30012.0
+    },
+    "Reconnaissance": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4718.0
+    },
+    "Theft": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4.0
+    },
+    "accuracy": 0.5433976697657997,
+    "macro avg": {
+        "precision": 0.2312167414787678,
+        "recall": 0.22936416883233574,
+        "f1-score": 0.21060542031342327,
+        "support": 67976.0
+    },1
+    "weighted avg": {
+        "precision": 0.5331910473786329,
+        "recall": 0.5433976697657997,
+        "f1-score": 0.49313092624080385,
+        "support": 67976.0
+    }
+}
