@@ -209,7 +209,7 @@ def resample_data(dataset):
 
 
 if __name__ == '__main__':
-    dataset = 'NF-BoT-IoT-v2'
+    dataset = 'NF-ToN-IoT-v2'
     resample_data(dataset)
 
 
