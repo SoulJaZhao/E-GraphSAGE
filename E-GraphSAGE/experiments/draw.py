@@ -31,8 +31,8 @@ def plot_metric(metric, title):
     # 绘制折线
     plt.plot(df['Model'], df[metric], marker='o', color='red', linewidth=2, label='Trend')
 
-    plt.title(title, fontsize=25)
-    plt.xlabel('Models', fontsize=20)
+    plt.title('', fontsize=25)
+    plt.xlabel('', fontsize=20)
     plt.ylabel(title, fontsize=20)
     plt.xticks(fontsize=15)
 
@@ -44,6 +44,6 @@ def plot_metric(metric, title):
     plt.close()
 
 # 绘制三种指标的图表
-plot_metric('F1 Score', 'Average F1 Score Comparison')
-plot_metric('Precision', 'Average Precision Comparison')
-plot_metric('Recall', 'Average Recall Comparison')
+plot_metric('F1 Score', 'Average F1 Score (%)')
+plot_metric('Precision', 'Average Precision (%)')
+plot_metric('Recall', 'Average Recall (%)')
